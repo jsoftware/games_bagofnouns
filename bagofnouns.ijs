@@ -115,6 +115,7 @@ while. do.   NB. loop here forever
     NB. perform pre-sync command processing
     senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('INCR "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
     NB. Create a connection to the server and send all the data in an INCR command
+    NB.?lintonly ssk =. 0
     for_dly. 1000 1000 1000 do.
       ssk =. 1 {:: sdsocket_jsocket_ ''  NB. listening socket
       sdioctl_jsocket_ ssk , FIONBIO_jsocket_ , 1  NB. Make socket non-blocking
