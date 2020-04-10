@@ -1,3 +1,6 @@
+require 'socket'
+require 'strings'
+sdcleanup_jsocket_ =: 3 : '0[(sdclose ::0:"0@[ shutdownJ@(;&2)"0)^:(*@#)SOCKETS_jsocket_'
 NB. Game states
 GSHELLO =: 0  NB. Initial login at station: clear username, clear incrhwmk
 GSLOGINOK =: 1  NB. OK to log in
@@ -179,19 +182,21 @@ smoutput'data from BE '
     while. do.
       'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
       if. rc~:0 do. 'Error reading from background' 13!:8 (4) end.
+      if. 0=#data do. 'Connection closed by background, restart' 13!:8 (5) end.
       hdr =. hdr , data
       if. 4=#hdr do. break. end.
-      if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';1000 do. 'Error reading from background' 13!:8 (4) end.
+      if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';4000 do. 'Error reading from background' 13!:8 (4) end.
     end.
     hlen =. _2 (3!:4) hdr   NB. Number of bytes to read
     readdata =. ''
     while. do.
       'rc data' =. sdrecv_jsocket_ sk,(4+hlen),00   NB. Read the data
       if. rc~:0 do. 'Error reading from background' 13!:8 (4) end.
+      if. 0=#data do. 'Connection closed by background, restart' 13!:8 (5) end.
       hlen =. hlen-#data  NB. decr count left
       if. hlen <: 0 do. cmdqueue =. cmdqueue , < readdata , hlen }. data break. end.
       readdata =. readdata , data
-      if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';1000 do. 'Error reading from background' 13!:8 (4) end.
+      if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';4000 do. 'Error reading from background' 13!:8 (4) end.
     end.
     if. hlen=0 do. break. end.
     hdr =. hlen {. data
@@ -202,6 +207,7 @@ end.
 catch.
   wd'psel formbon;ptimer 0'
   smoutput'error in timer handler'
+  sdclose_jsocket_ sk  NB. If the background closed the socket, let it close properly
 end.
 i. 0 0
 )
@@ -375,7 +381,8 @@ wd 'set fmawaygone value ' , ": loggedin *. (<Glogin) e. 1 {:: Gawaystatus
 handGwordstatus =: 3 : 0
 if. Gstate=GSWORDS do.
   wd 'set fmprogress value *',": #Gwordstatus
-  if. #missing =. (;Gteams) -. {."1 Gwordstatus do.
+  if. 0=#;Gteams do. wd 'set fmgeneral text *Waiting for first login'
+  elseif. #missing =. (;Gteams) -. {."1 Gwordstatus do.
     wd 'set fmgeneral text *Players who have not entered words:<br>' , ;:^:_1 missing
   else. wd 'set fmgeneral text *All players have entered words'
   end.
@@ -527,8 +534,8 @@ wds =. wds -. a:  NB. Remove empty words
 if. 0=#wds do. wd'mb info mb_ok "No words" "You didn''t put any words on the clipboard."' return. end.
 if. 15<#wds do. wd'mb info mb_ok "Too many words" "You have too many words."' return. end.
 if. 30 < >./ #@> wds do. wd'mb info mb_ok "Too long" "One of your words is too long."' return. end.
-if. 'OK' -: wd'mb info mb_ok "Is this word list OK?" *', ; ,&LF&.> wds do.
-  backcmd '''',Glogin''' ; ' , 5!:5 <'wds'
+if. 'ok' -: wd'mb query mb_ok "Is this word list OK?" *', ; ,&LF&.> wds do.
+  backcmd 'WORDS ''',Glogin,''' ,&< ' , 5!:5 <'wds'
 end.
 )
 
@@ -541,8 +548,6 @@ NB. destroys itself when transaction is complete
 NB. This class also includes the utilities to create file-server requests
 NB. and responses, and decode same
 
-require 'socket'
-require 'strings'
 coclass 'sockfileserver'
 NB. the cache for INCR commands
 incrfn =: ''

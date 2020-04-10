@@ -52,6 +52,7 @@ startgame =: 3 : 0
 if. (,2) -.@-: $y do. 'Usage: startgame ''tourn-name'';''password''' return. end.
 if. 32 ~: 3!:0 y do. 'Usage: startgame ''tourn-name'';''password''' return. end.
 if. +./ 2 ~: 3!:0@> y do. 'Usage: startgame ''tourn-name'';''password''' return. end.
+initstate''
 'tourn password' =: y
 sdcleanup_jsocket_''  NB. debugging
 lsk =: 1 {:: sdsocket_jsocket_ ''  NB. listening socket
@@ -59,6 +60,119 @@ rc =. sdbind_jsocket_ lsk ; AF_INET_jsocket_ ; '' ; 8090  NB. listen on port 809
 if. 0~:rc do. ('Error ',(":rc),'binding to 8090') 13!:8 (4) end.
 NB. Wait for hello
 sockloop lsk;tourn;password
+)
+
+sockpoll =: 3 : 0
+'qbm sk tourn password' =. y
+feconnlost=.0
+NB. Wait for a pulse from the front end
+if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.  NB. allow long time for dialog box
+  return.  NB. scaf
+  smoutput 'heartbeat lost' return. 
+end.
+NB. There is data to read.  Read it all, until we have the complete message(s).  First 4 bytes are the length
+hdr =. ''   NB. No data, no bytes of header
+cmdqueue =. 0$a:  NB. List of commands
+while. do.
+  while. do.
+    'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
+    if. 0{::rc do. 'Error ',(":0{::rc),' reading from frontend' 13!:8 (4) end.
+    if. 0=#data do. feconnlost=.1 break. end.
+    hdr =. hdr , data
+    if. 4=#hdr do. break. end.
+    if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.4 break. end.
+  end.
+  if. feconnlost do. break. end.
+  hlen =. _2 (3!:4) hdr   NB. Number of bytes to read - could be 0
+  readdata =. ''
+  while. hlen > 0 do.
+    if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.2 break. end.
+    'rc data' =. sdrecv_jsocket_ sk,(4+hlen),00   NB. Read the data, plus the next length
+    if. rc~:0 do. 'Error ',(":0{::rc),' reading from frontend' 13!:8 (4) end.
+    if. 0=#data do. feconnlost=.3 break. end.
+    readdata =. readdata , data
+    hlen=.hlen-#data  NB. when we have all the data, plus possibly the next length
+  end.
+  if. feconnlost do. break. end.
+  NB. If there is not another command, exit to process them
+  cmdqueue =. cmdqueue , < hlen }. readdata
+  if. hlen >: 0 do. break. end.  NB. >0 only if error
+  hdr =. hlen {. readdata  NB. transfer the length
+  if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.5 break. end.
+end.
+if. feconnlost do. return. end.
+NB. perform pre-sync command processing
+if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
+senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('INCR "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
+NB. Create a connection to the server and send all the data in an INCR command
+for_dly. 1000 1000 1000 do.
+  NB.?lintloopbodyalways
+  ssk =. 1 {:: sdsocket_jsocket_ ''  NB. listening socket
+  sdioctl_jsocket_ ssk , FIONBIO_jsocket_ , 1  NB. Make socket non-blocking
+  rc =. sdconnect_jsocket_ ssk;qbm,<8090
+  if. ssk e. sds   =. 2 {:: sdselect_jsocket_ '';ssk;'';dly do. break. end.
+  sdclose_jsocket_ ssk
+  smoutput 'Error ' , (":rc) , ' connecting to server'
+  qbm =. }. sdgethostbyname_jsocket_ 'www.quizbowlmanager.com'  NB. In case the address changed
+  ssk =. 0
+end.
+if. ssk=0 do.  NB. uncorrectable server error
+  'Unable to reach game server.  Check your Internet.' 13!:8 (4)
+end.
+NB. Send the data.  Should always go in one go
+while. #senddata do.
+  rc =. senddata sdsend_jsocket_ ssk,0
+  if. 0{::rc do. 'Error ',(":0{::rc),' in sdsend to server' 13!:8 (4) end.
+  if. (#senddata) = 1{::rc do. break. end.
+  senddata =. (1{::rc) }. senddata
+  if. -. ssk e. 2 {:: sdselect_jsocket_ '';ssk;'';5000 do. rc =. 1;'' break. end.
+end.
+if. 0{::rc do. sdclose_jsocket_ ssk return. end.  NB. error sending - what's that about?  Abort
+NB. Read the response, until the server closes
+readdata =. ''
+while. do.
+  for. i. 3 do.
+    NB.?lintloopbodyalways
+    rsockl =. 1 {:: sdselect_jsocket_ ssk;'';ssk;4000
+    if. ssk e. rsockl do. break. end.  NB. should respond quickly
+    smoutput '4s timeout from server'
+  end.
+  if. -. ssk e. rsockl do. readdata =. '' break. end.  NB. Exit with empty data as error flag
+  'rc data' =. sdrecv_jsocket_ ssk,10000,0
+  if. rc do. 'Error ',(":rc),' in sdrecv from server' 13!:8 (4) end.
+  if. 0=#data do. break. end.  NB. Normal exit: host closes connection
+  readdata =. readdata , data  NB. Accumulate reply
+end.
+sdclose_jsocket_ ssk
+if. #readdata do.
+  NB. Verify response validity.
+  NB. If we don't get a valid response, the game is in an unknown state.  There's nothing good to do, so we
+  NB. will ignore the response and continue, hoping that the host correctly logged our data
+  'rc data' =. fileserv_decrsphdr_sockfileserver_ readdata
+  NB. Process the response
+  if. (rc=0) do.   NB. to handle login seq we must pass heartbeats through
+if. #data do. qprintf'data 'end.
+    incrhwmk   =: (0 >.incrhwmk) + #data  NB.Since we processed it, skip over this data in the future
+    postsync data
+    NB. Send new state info to the front end
+    gbls =. ".&.> gblifnames  NB. current values
+    chgmsk =. gbls ~: Ggbls  NB. see what's different
+    diffs =. (chgmsk # gblifnames) ,. chgmsk # gbls
+    Ggbls =: gbls  NB. save old state
+    if. #diffs do.
+      chg =. 5!:5 <'diffs'  NB. Get data to send
+      senddata =. (2 (3!:4) #chg) , chg   NB. prepend length
+      while. #senddata do.
+        if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';5000 do. 'Timeout sending to frontend' 13!:8 (4) end.
+        rc =. senddata sdsend_jsocket_ sk,0
+        if. 0{::rc do. 'Error ',(":0{::rc),' in sdsend to frontend' 13!:8 (4) end.
+        if. (#senddata) = 1{::rc do. break. end.
+        senddata =. (1{::rc) }. senddata
+      end.
+    end.
+  end.
+end.
+NB. If we did not read a response, quietly discard it
 )
 
 NB. Loop forever reading/writing sockets. y is the socket we are listening on.
@@ -75,120 +189,33 @@ while. do.   NB. loop here forever
   if. 0~:0{::rc do. ('Error ',(":0{::rc),'connecting to frontend') 13!:8 (4) end.
   sk =. 1 {:: rc   NB. front-end socket number
   NB. Main loop: read from frontend, INCR to the server, process the response
-  feconnlost=.0
+if. 0 do.
   while. do.
-   NB. Wait for a pulse from the front end
-    if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';1000 do.  NB. scaf 5000
-      smoutput 'heartbeat lost' return. break.  NB. scaf 
-    end.
-    NB. There is data to read.  Read it all, until we have the complete message(s).  First 4 bytes are the length
-    hdr =. ''   NB. No data, no bytes of header
-    cmdqueue =. 0$a:  NB. List of commands
-    while. do.
-      while. do.
-        'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
-        if. 0{::rc do. 'Error ',(":0{::rc),' reading from frontend' 13!:8 (4) end.
-        if. 0=#data do. feconnlost=.1 break. end.
-        hdr =. hdr , data
-        if. 4=#hdr do. break. end.
-        if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.4 break. end.
-      end.
-      if. feconnlost do. break. end.
-      hlen =. _2 (3!:4) hdr   NB. Number of bytes to read - could be 0
-      readdata =. ''
-      while. hlen > 0 do.
-        if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.2 break. end.
-        'rc data' =. sdrecv_jsocket_ sk,(4+hlen),00   NB. Read the data, plus the next length
-        if. rc~:0 do. 'Error ',(":0{::rc),' reading from frontend' 13!:8 (4) end.
-        if. 0=#data do. feconnlost=.3 break. end.
-        readdata =. readdata , data
-        hlen=.hlen-#data  NB. when we have all the data, plus possibly the next length
-      end.
-      if. feconnlost do. break. end.
-      NB. If there is not another command, exit to process them
-      cmdqueue =. cmdqueue , < hlen }. readdata
-      if. hlen >: 0 do. break. end.  NB. >0 only if error
-      hdr =. hlen {. readdata  NB. transfer the length
-      if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.5 break. end.
-    end.
-    if. feconnlost do. break. end.
-    NB. perform pre-sync command processing
-    senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('INCR "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
-    NB. Create a connection to the server and send all the data in an INCR command
-    NB.?lintonly ssk =. 0
-    for_dly. 1000 1000 1000 do.
-      ssk =. 1 {:: sdsocket_jsocket_ ''  NB. listening socket
-      sdioctl_jsocket_ ssk , FIONBIO_jsocket_ , 1  NB. Make socket non-blocking
-      rc =. sdconnect_jsocket_ ssk;qbm,<8090
-      if. ssk e. sds   =. 2 {:: sdselect_jsocket_ '';ssk;'';dly do. break. end.
-      sdclose_jsocket_ ssk
-      smoutput 'Error ' , (":rc) , ' connecting to server'
-      qbm =. }. sdgethostbyname_jsocket_ 'www.quizbowlmanager.com'  NB. In case the address changed
-      ssk =. 0
-    end.
-    if. ssk=0 do.  NB. uncorrectable server error
-      'Unable to reach game server.  Check your Internet.' 13!:8 (4)
-    end.
-    NB. Send the data.  Should always go in one go
-    while. #senddata do.
-      rc =. senddata sdsend_jsocket_ ssk,0
-      if. 0{::rc do. 'Error ',(":0{::rc),' in sdsend to server' 13!:8 (4) end.
-      if. (#senddata) = 1{::rc do. break. end.
-      senddata =. (1{::rc) }. senddata
-      if. -. ssk e. 2 {:: sdselect_jsocket_ '';ssk;'';5000 do. rc =. 1;'' break. end.
-    end.
-    if. 0{::rc do. sdclose_jsocket_ ssk break. end.  NB. error sending - what's that about?  Abort
-    NB. Read the response, until the server closes
-    readdata =. ''
-    while. do.
-      for. i. 3 do.
-        rsockl =. 1 {:: sdselect_jsocket_ ssk;'';ssk;4000
-        if. ssk e. rsockl do. break. end.  NB. should respond quickly
-        smoutput '4s timeout from server'
-      end.
-      if. -. ssk e. rsockl do. readdata =. '' break. end.  NB. Exit with empty data as error flag
-      'rc data' =. sdrecv_jsocket_ ssk,10000,0
-      if. rc do. 'Error ',(":rc),' in sdrecv from server' 13!:8 (4) end.
-      if. 0=#data do. break. end.  NB. Normal exit: host closes connection
-      readdata =. readdata , data  NB. Accumulate reply
-    end.
-    sdclose_jsocket_ ssk
-qprintf'readdata '
-    if. #readdata do.
-      NB. Verify response validity.
-      NB. If we don't get a valid response, the game is in an unknown state.  There's nothing good to do, so we
-      NB. will ignore the response and continue, hoping that the host correctly logged our data
-      'rc data' =. fileserv_decrsphdr_sockfileserver_ readdata
-qprintf'rc data '
-      NB. Process the response
-      if. rc=0 do.
-        incrhwmk   =: (0 >.incrhwmk) + #data  NB.Since we processed it, skip over this data in the future
-        postsync data
-        NB. Send new state info to the front end
-        gbls =. ".&.> gblifnames  NB. current values
-        chgmsk =. gbls ~: Ggbls  NB. see what's different
-        diffs =. (chgmsk # gblifnames) ,. chgmsk # gbls
-        Ggbls =: gbls  NB. save old state
-        if. #diffs do.
-          chg =. 5!:5 <'diffs'  NB. Get data to send
-          senddata =. (2 (3!:4) #chg) , chg   NB. prepend length
-          while. #senddata do.
-            if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';5000 do. 'Timeout sending to frontend' 13!:8 (4) end.
-            rc =. senddata sdsend_jsocket_ sk,0
-            if. 0{::rc do. 'Error ',(":0{::rc),' in sdsend to frontend' 13!:8 (4) end.
-            if. (#senddata) = 1{::rc do. break. end.
-            senddata =. (1{::rc) }. senddata
-          end.
-        end.
-      end.
-    end.
-    NB. If we did not read a response, quietly discard it
+    sockpoll qbm;sk;tourn;password
   end.
   NB. connection lost, close socket and rewait
   sdclose_jsocket_ sk
+else.
+  NB. debug version using timer
+  timerpms =: qbm;sk;tourn;password
+  wd 'timer 100'
+end.
 return.  NB. scaf
 end.
 )
+
+sys_timer  =: 3 : 0
+try. sockpoll timerpms
+catch.
+wd 'timer 0'
+smoutput 'error in timer'
+smoutput (<: 13!:11'') {:: 9!:8''
+smoutput 13!:12''
+end.
+i. 0 0
+)
+sys_timer_z_ =: sys_timer_base_
+
 
 gblifnames =: ;:'Gstate Gscore Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin'
 
@@ -213,6 +240,7 @@ inithwmk =: 0
 ourloginname =: ''
 rejcmd =: ''  NB. set to a LOGINREJ cmd if we need one
 Ggbls =: 0:"0 gblifnames  NB. Init old copy = something that never matches a boxed value
+NB.?lintsaveglobals
 )
 initstate''
 
@@ -236,6 +264,7 @@ ourloginname =: ".y   NB. Remember who we're logging in... (y is uninterpreted h
 ourlogintime =: 0   NB. wait for LOGINREQ
 Glogin =: ''  NB. not logged in now!
 'LOGINREQ ' , y , CRLF   NB. start the login sequence
+NB.?lintsaveglobals
 )
 
 presyhDEAL =: 3 : 0
@@ -296,8 +325,14 @@ end.
 
 NB. y is 2 boxes of names
 postyhTEAMS =: 3 : 0
-NB. Accept the teams if they embrace all players and we haven't started, otherwise discard
-if. Gstate=GSWORDS do. if. 0=# (;Gteams) -. ;y do. Gteams =: y end. end.
+NB. Accept the teams if they embrace all players and we haven't started, otherwise discard.  There must be at least 4 players, and no multiple assignments
+if. Gstate=GSWORDS do.
+  if. (0=# (;Gteams) -.;y) *. (0=# (;y) -.;Gteams) do.
+    if. 4 <: #;y do.
+      Gteams =: y
+    end.
+  end.
+end.
 ''
 )
 
@@ -335,20 +370,26 @@ NB. name - start the game phase
 postyhSTART =: 3 : 0
 NB. Ignore if game is underway or teams have not been assigned
 if. (Gstate=GSWORDS) *. 2=#Gteams do.
+NB.?lintonly Gteams =: (;:'Bob Carol'),&<(;:'Ted Alice')
   NB. Reset game, move to playing state
   Gteamup =: 0 [ actorhist =: 0 2$a:
   NB. Init the wordlist and history from prev round
   NB. wordbag is list of round;word where each round's words are put in pseudorandom order by CRC, but kept in group by round
-  words =. /:~~ ; 1 {"1 wordstatus   NB. All the words, in order
+  words =. /:~~ ; 1 {"1 Gwordstatus   NB. All the words, in order
   wordbag =: ,/ 0 1 2 ([ ;"0 ;@:(<@(] /: (128!:3@,&> {&(;:'aV76 Gr83l H2df968'))~)))"0 _ words
+NB.?lintonly wordbag =: ,: 1;'word'
   NB. exposedwords is the priority list that we must finish before going into the wordbag.  It is
   NB. round;word;score (where score of 0 0 means don't know)
   exposedwords =: 0 3$a:
+NB.?lintonly exposedwords =: ,: 1;'word';1 1
   NB. dqlist is a list of round;word;name for every time a word is added to the exposedwords
   dqlist =: 0 3$a:
+NB.?lintonly dqlist =: ,: 1;'word';'name'
   NB. Gwordqueue is a list of round;word;dqlist where each word is in Groundno.  These words are exposed to the actor
   Gwordqueue =: 0 3$a:
+NB. Gwordqueue =: ,: '1';'word';< ,<'dq'
   Gstate=:GSWACTOR
+NB.?lintsaveglobals
 ''
 end.
 )
@@ -385,14 +426,14 @@ NB. name do/undo
 postyhSCORER =: 3 : 0
 NB. Accept if in WSCORER or CHANGEWSCORER (type=1) or WSTART or CHANGEWSTART (type=0 & name match)
 'name do' =. y
-if. do = (1 0 ,((name-:Gscorer) { 2 2,:0 0),2) {~ (GSWSCORER,GSWCHANGESCORER,GSWSTART,GSWCHANGEWSTART) i. Gstate do.
+if. do = (1 0 ,((name-:Gscorer) { 2 2,:0 0),2) {~ (GSWSCORER,GSCHANGEWSCORER,GSWSTART,GSCHANGEWSTART) i. Gstate do.
   if. do do.
     Gscorer =: name
-    Gstate =: (Gstate=GWSCORER) { GSWCHANGEWSTART,GSWSTART
+    Gstate =: (Gstate=GSWSCORER) { GSCHANGEWSTART,GSWSTART
   else.
     NB. It's an undo
     Gscorer =: ''
-    Gstate =: (Gstate=GSWSTART) { GSWCHANGESCORER,GSWSCORER
+    Gstate =: (Gstate=GSWSTART) { GSCHANGEWSCORER,GSWSCORER
   end.
 end.
 ''
@@ -401,15 +442,18 @@ end.
 NB. nilad
 postyhACT =: 3 : 0
 NB. Accept in WSTART or CHANGEWSTART
-if. Gstate e. GSWSTART,GSWCHANGESTART do.
+if. Gstate e. GSWSTART,GSCHANGEWSTART do.
   NB. go ACTING state.  If we were in START, start the timer.  This starts the turn
   if. Gstate = GSWSTART do.
     Gtimedisp =: Groundno { Groundtimes
     NB. turnwordlist is the list of round;word;score for words that have been moved off the wordqueue.  Taken together, turnwordhist and Gwordqueue
     NB. have all the words that were exposed this turn
     turnwordlist =: 0 3$a:
+    NB.?lintonly turnwordlist =: ,: 1;'word';1 1
     NB. We save a copy of the exposedwords before we start so that we can delete words dismissed twice in a row
     prevexposedwords =: exposedwords
+    NB.?lintonly prevexposedwords =: ,: 1;'word';1 1
+    NB.?lintsaveglobals
   end.
   Gstate =: GSACTING
   getnextword''   NB. Prime the pipe
@@ -422,14 +466,16 @@ NB. We always take from the exposedwords if there is one.  Otherwise we draw fro
 NB. BUT: we never draw a word if it is a different round from the word on the stack
 getnextword =: 3 : 0
 while. 2 > #Gwordqueue do.
-  nextword =. ''  NB. Indicate no word added
+  nextrdwd =. ''  NB. Indicate no word added
   NB. If there is a word in the queue, save its round to indicate we must match it; otherwise empty to match anything
   if. #exposedwords do. if. Groundno = (<0 0) {:: exposedwords do.
     NB. There is a valid exposed word.  Take it
-    nextrdwd =. (<0;0 1) { exposedwords [ exposedwords =: }. exposedwords
+    nextrdwd =. (<0;0 1) { exposedwords
+    exposedwords =: }. exposedwords
   end. elseif. #wordbag do. if. Groundno = (<0 0) {:: wordbag do.
     NB. There is a valid word in the bag.  Take it
-    nextrdwd =. (<0;0 1) { wordbag [ wordbag =: }. wordbag
+    nextrdwd =. (<0;0 1) { wordbag
+    wordbag =: }. wordbag
   end. end.
   NB. If there is no word to add, exit
   if. 0=#nextrdwd do. break. end.
@@ -479,11 +525,11 @@ end.
 
 postyhPREVWORD =: 3 : 0
 NB. If there is a word in the turnlist, and  we are acting or paused, or we are settling and there is time on the clock, accept this command
-if. Gwordundook *. (Gstate e. GSACTING,GSPAUSE) +. (Gstate e, GSSETTLE,GSCONFIRM) *. Gtimedisp>0 do.
-  NB. Move tail of turnwords to head to Gwordqueue, adding in the dq info
+if. Gwordundook *. (Gstate e. GSACTING,GSPAUSE) +. (Gstate e. GSSETTLE,GSCONFIRM) *. Gtimedisp>0 do.
+  NB. Move tail of turnwords to head of Gwordqueue, adding in the dq info
   tailwd =. {: turnwordlist
   thisdq =. (((2{.tailwd) -:"1 (2 {."1 dqlist)) # (2 {"1 dqlist)) -. (-.Gteamup) {:: Gteams
-  Gwordqueue =: Gwordqueue , (1 { nextrdwd) , < thisdq
+  Gwordqueue =: Gwordqueue ,~ (2 {. tailwd) , < thisdq
   turnwordlist =: }: turnwordlist
   Gwordundook =: *@# turnwordlist  NB. Allow undo if there's something to bring back
   NB. Undo the score
@@ -492,7 +538,7 @@ if. Gwordundook *. (Gstate e. GSACTING,GSPAUSE) +. (Gstate e, GSSETTLE,GSCONFIRM
   NB. Handle changes of state.
   NB. If we are ACTING or PAUSED, and the new word is for a different round, go to CHANGE state for that round
   NB. If we are SETTLING or CONFIRM, stay in that state until the queue is empty
-  if. (Gstate e. GSACTING,GSPAUSED) *. Groundno ~: (<0 0) {:: Gwordqueue do. Gstate =: GSCHANGE end.
+  if. (Gstate e. GSACTING,GSPAUSE) *. Groundno ~: (<0 0) {:: Gwordqueue do. Gstate =: GSCHANGE end.
 end.
 ''
 )
@@ -510,12 +556,12 @@ postyhCOMMIT =: 3 : 0
 NB. Accept if in CONFIRM state
 if. Gstate = GSCONFIRM do.
   NB. If exposed and bag are empty, this actor gets no more words, so take the time away
-  if. exposedwords +:&(*@#) wordlist do. Gtimedisp =. 0 end.
+  if. exposedwords +:&(*@#) wordbag do. Gtimedisp =. 0 end.
   if. Gtimedisp=0 do.
     NB. if no time left, handle end-of-turn
     NB. Display & Discard words that have been passed twice in a row
-    oldpass =. ((0;0 0) -:"1 (0 2) {"1 prevexposedwords) # 1 {"1
-    newpass =. ((0;0 0) -:"1 (0 2) {"1 turnwordlist) # 1 {"1
+    oldpass =. ((0;0 0) -:"1 (0 2) {"1 prevexposedwords) # 1 {"1 prevexposedwords
+    newpass =. ((0;0 0) -:"1 (0 2) {"1 turnwordlist) # 1 {"1 turnwordlist
     retired =. newpass (e. # [) oldpass  NB. words passed twice in a row in the first round
     Glogtext =: Glogtext , ;@:(('discarded: ' , LF ,~ ])&.>) retired
     turnwordlist =. (retired -.@e.~ 1 {"1 turnwordlist) # turnwordlist
@@ -523,20 +569,20 @@ if. Gstate = GSCONFIRM do.
 
     NB. Display & Discard words that have been marked as retired
     handledmsk =. (2;1)&{::"1 turnwordlist  NB. words we finished
-    Glogtext =: Glogtext , (2;0)&{::"1 turnwordlist ;@:(({::&('guessed late: ';'guessed: ')@[ , LF ,~ ])&.>) 1 {"1 turnwordlist
+    Glogtext =: Glogtext , ((2;0)&{::"1 turnwordlist) ;@:(({::&('guessed late: ';'guessed: ')@[ , LF ,~ ])&.>) 1 {"1 turnwordlist
     NB. Put the reamining turn words into the exposed list
     exposedwords =: (-. handledmsk) # turnwordlist
   end.
   NB. Figure next state:
   NB. GAMEOVER if the exposed and bag are still empty
-  if. exposedwords +:&(*@#) wordlist do. Gstate =: GSGAMEOVER
+  if. exposedwords +:&(*@#) wordbag do. Gstate =: GSGAMEOVER
   NB. CHANGE if it's a round change and there is time - change roundno first
   elseif. (Gtimedisp~:0) *. Groundno~:nextroundno''do.
     Gstate =: GSCHANGE
     Groundno =: nextroundno''  NB. set new round# before going to CHANGE state
   else.
     NB. Should be out of time, since there are no words to act.  Clear time just in case, and go look for next actor, from the other team
-    Gtimedisp =: 0 [ Gteamno =: -. Gteamno [ Gstate =: GSWACTOR
+    Gtimedisp =: 0 [ Gteamup =: -. Gteamup [ Gstate =: GSWACTOR
   end. 
 end.
 ''
