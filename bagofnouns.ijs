@@ -71,7 +71,6 @@ if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.  NB. allow long time for dia
   return.  NB. scaf
   smoutput 'heartbeat lost' return. 
 end.
-smoutput 'read'
 NB. There is data to read.  Read it all, until we have the complete message(s).  First 4 bytes are the length
 hdr =. ''   NB. No data, no bytes of header
 cmdqueue =. 0$a:  NB. List of commands
@@ -271,7 +270,7 @@ NB.?lintsaveglobals
 
 presyhDEAL =: 3 : 0
 if. #Gteams do.
-  draw =. Gteams ({~ ,&< ({~ <@<@<)) ((<.@-:@#) ? #) ; Gteams
+  draw =. (({~ ,&< ({~ <@<@<)) ((<.@-:@#) ? #)) ; Gteams
   'TEAMS ' , (5!:5<'draw') , CRLF
 else. ''
 end.
@@ -565,13 +564,13 @@ if. Gstate = GSCONFIRM do.
     oldpass =. ((0;0 0) -:"1 (0 2) {"1 prevexposedwords) # 1 {"1 prevexposedwords
     newpass =. ((0;0 0) -:"1 (0 2) {"1 turnwordlist) # 1 {"1 turnwordlist
     retired =. newpass (e. # [) oldpass  NB. words passed twice in a row in the first round
-    Glogtext =: Glogtext , ;@:(('discarded: ' , LF ,~ ])&.>) retired
+    Glogtext =: Glogtext , ;@:(('discarded: ' , '<br>' ,~ ])&.>) retired
     turnwordlist =. (retired -.@e.~ 1 {"1 turnwordlist) # turnwordlist
     wordbag =. (retired -.@e.~ 1 {"1 wordbag) # wordbag
 
     NB. Display & Discard words that have been marked as retired
     handledmsk =. (2;1)&{::"1 turnwordlist  NB. words we finished
-    Glogtext =: Glogtext , ((2;0)&{::"1 turnwordlist) ;@:(({::&('guessed late: ';'guessed: ')@[ , LF ,~ ])&.>) 1 {"1 turnwordlist
+    Glogtext =: Glogtext , ((2;0)&{::"1 turnwordlist) ;@:(({::&('guessed late: ';'guessed: ')@[ , '<br>' ,~ ])&.>) 1 {"1 turnwordlist
     NB. Put the reamining turn words into the exposed list
     exposedwords =: (-. handledmsk) # turnwordlist
   end.
@@ -603,7 +602,7 @@ postyhSCOREADJ =: 3 : 0
 NB. Accept during SETTLE or CONFIRM only
 if. Gstate e. GSSETTLE,GSCONFIRM do.
   Gscore =: (incr + team { Gscore) team} Gscore
-  if. *@# name do. Glogtext =: Glogtext , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' points' , ((incr>0){::' from ';' to ') , 'team ' , (":team) , LF end.
+  if. *@# name do. Glogtext =: Glogtext , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' points' , ((incr>0){::' from ';' to ') , 'team ' , (":team) , '<br>' end.
 end.
 ''
 )
@@ -622,7 +621,7 @@ else.
     NB. Apply change
     Gtimedisp =: 0 >. Gtimedisp + incr
     NB. Log it
-    if. *@# name do. Glogtext =: Glogtext , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' seconds ' , LF end.
+    if. *@# name do. Glogtext =: Glogtext , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' seconds ' , '<br>' end.
     NB. Changing the clock-zero status is a change of state.
     if. prevtime ~:&* Gtimedisp do.
       if. Gtimedisp do.
