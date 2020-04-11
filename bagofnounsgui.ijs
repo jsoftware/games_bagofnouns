@@ -155,6 +155,7 @@ if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';4000 do. 'Error connecting to back
 NB. Start with a message to say we arrived.  The response must set all our globals
 backcmd 'HELLO ',":cleargame
 cleargame=:0  NB. Don't do it again accidentally
+wd :: 0: 'psel formbon;pclose'
 wd FORMBON
 wd 'set fmretire0 text *Don''t',LF,'Know It'
 wd 'set fmretire2 text *Got',LF,'It'
@@ -208,7 +209,10 @@ smoutput'data from BE '
 end.
 catch.
   wd'psel formbon;ptimer 0'
+  nextheartbeat =: _
   smoutput'error in timer handler'
+  smoutput (<: 13!:11'') {:: 9!:8''
+  smoutput 13!:12''
   sdclose_jsocket_ sk  NB. If the background closed the socket, let it close properly
 end.
 i. 0 0
@@ -261,7 +265,7 @@ wd 'set fmcharades90 checked ' , ": 90 = 1 { Groundtimes
 ''
 )
 
-Gteamnames =: 'Team 0';'Team 1'
+Gteamnames =: 'Red';'Black'
 
 NB. Button-enable based on state
 NB. rows are buttons, columns are state. c1 is always 1, l1 only if logged in
@@ -305,7 +309,7 @@ case. GSHELLO do. text =. 'Catching up'
 case. GSLOGINOK do. text =. 'OK to login'
 case. GSAUTH do. text =. 'Waiting for authorization'
 case. GSWORDS do. text =. 'Players are entering words'
-case. GSACTOR do. text =. 'Need actor for ' (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
+case. GSWACTOR do. text =. 'Need actor for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
 case. GSWSCORER do. text =. 'Need someone to score for ' , Gactor
 case. GSWSTART do. text =. 'Waiting for ' , Gscorer , ' to start the clock'
 case. GSACTING do. text =. Gactor , ' is acting ' , (Groundno {:: 'Taboo';'Charades';'Password') , ' and ' , ((Gactor -.@-: Gscorer) # Gscorer , ' is ') , 'scoring'
@@ -455,7 +459,7 @@ formbon_fmteamshow_button =: 3 : 0
 if. 1=#Gteams do.
   wd 'mb info mb_ok "Teams Not Assigned Yet" *The players are:',LF,LF, ; ,&LF&.> ; Gteams
 elseif. 2=#Gteams do.
-  wd 'mb info mb_ok "Teams" *' , , ,&LF"1 (,. '  ' ,"1 ])&:>/ (a: ,.~ 'Team 0';'Team 1')  ,. > Gteams
+  wd 'mb info mb_ok "Teams" *' , , ,&LF"1 (,. '  ' ,"1 ])&:>/ (a: ,.~ Gteamnames)  ,. > Gteams
 end.
 i. 0 0
 )
