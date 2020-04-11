@@ -390,6 +390,7 @@ NB.?lintonly dqlist =: ,: 1;'word';'name'
   NB. Gwordqueue is a list of round;word;dqlist where each word is in Groundno.  These words are exposed to the actor
   Gwordqueue =: 0 3$a:
 NB. Gwordqueue =: ,: '1';'word';< ,<'dq'
+  Groundno =: 0
   Gstate=:GSWACTOR
 NB.?lintsaveglobals
 ''
@@ -540,14 +541,17 @@ if. Gwordundook *. (Gstate e. GSACTING,GSPAUSE) +. (Gstate e. GSSETTLE,GSCONFIRM
   NB. Handle changes of state.
   NB. If we are ACTING or PAUSED, and the new word is for a different round, go to CHANGE state for that round
   NB. If we are SETTLING or CONFIRM, stay in that state until the queue is empty
-  if. (Gstate e. GSACTING,GSPAUSE) *. Groundno ~: (<0 0) {:: Gwordqueue do. Gstate =: GSCHANGE end.
+  if. (Gstate e. GSACTING,GSPAUSE) *. Groundno ~: (<0 0) {:: Gwordqueue do.
+    Groundno =: (<0 0) {:: Gwordqueue  NB. set new round before CHANGE
+    Gstate =: GSCHANGE
+  end.
 end.
 ''
 )
 
 NB. nilad
 postyhPROCEED =: 3 : 0
-NB. Valid only in CHANGE state.  If the timer is running, go to CHANGEWACTOR, otherwise WSCORER of WSTART
+NB. Valid only in CHANGE state.  If the timer is running, go to CHANGEWACTOR, otherwise WSCORER or WSTART
 if. Gstate=GSCHANGE do.
   Gstate =: (Gtimedisp=0) { GSCHANGEWACTOR,(*@#Gscorer){GSWSCORER,GSWSTART
 end.

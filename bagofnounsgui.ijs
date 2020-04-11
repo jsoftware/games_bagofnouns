@@ -303,7 +303,7 @@ NB. Set all the enables
 NB. Set display for the variable buttons
 wd 'set fmsieze0 text *' , (1;((0{::buttoncaptions0) i. Gstate)) {:: buttoncaptions0
 wd 'set fmsieze1 text *' , (1;((0{::buttoncaptions1) i. Gstate)) {:: buttoncaptions1
-NB. Display the status line
+NB. Display the status line; if the general line is known from the state, do it too
 select. Gstate
 case. GSHELLO do. text =. 'Catching up'
 case. GSLOGINOK do. text =. 'OK to login'
@@ -316,13 +316,16 @@ case. GSACTING do. text =. Gactor , ' is acting ' , (Groundno {:: 'Taboo';'Chara
 case. GSPAUSE do. text =. 'Clock is stopped while ' , Gactor , ' is acting ' , (Groundno {:: 'Taboo';'Charades';'Password')
 case. GSSETTLE do. text =. Gactor , ' is entering scores for the last words'
 case. GSCONFIRM do. text =. 'Last chance to change the scores and words for this round'
-case. GSCHANGE do. text =. 'End of round.  Changing to ' , Groundno {:: 'Taboo';'Charades';'Password';'Scotch'
+case. GSCHANGE do.
+  wd 'set fmgeneral text *Round change!  You will be acting ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
+  text =. 'Changing to ' , Groundno {:: 'Taboo';'Charades';'Password';'Scotch'
 case. GSCHANGEWACTOR do. text =. 'Is a scorer needed?' 
 case. GSCHANGEWSCORER do. text =. 'Need someone to score for ' , Gactor
 case. GSCHANGEWSTART do. text =. 'Waiting for ' , Gscorer , ' to start the clock'
 case. GSGAMEOVER do. text =. 'Game Over'
 case. do. text =. ''
 end.
+
 wd 'set fmstatus text *', text
 ''
 )
@@ -335,7 +338,7 @@ GSACTING 'Stop the clock'  'TIMERADJ 0;0;'''
 GSPAUSE 'Start the clock'  'TIMERADJ 1;0;'''
 GSSETTLE 'Guessed late:*retire word'   'NEXTWORD 0 1'
 GSCONFIRM 'Irrevocably*enter*this score'   'COMMIT 0'
-GSCHANGE 'Proceed' 'PROCEED 0'
+GSCHANGE 'Yes, proceed' 'PROCEED 0'
 GSCHANGEWACTOR 'I don''t need*a scorer'   'ACTOR '';1;0'
 GSCHANGEWSCORER ''    ''
 GSCHANGEWSTART 'Start the clock'  'ACT 0'
