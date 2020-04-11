@@ -483,7 +483,7 @@ while. 2 > #Gwordqueue do.
   NB. If there is no word to add, exit
   if. 0=#nextrdwd do. break. end.
   NB. Expose the word.  Add the actor to the dqlist for the word
-  thisdq =. ((nextrdwd -:"1 (2 {."1 dqlist)) # (2 {"1 dqlist)) -. (-.Gteamup) {:: Gteams
+  thisdq =. ((nextrdwd -:"1 (2 {."1 dqlist)) # (2 {"1 dqlist)) -. (<Gactor) , (-.Gteamup) {:: Gteams
   Gwordqueue =: Gwordqueue , nextrdwd , < thisdq
   dqlist =: dqlist , nextrdwd , < Gactor
 end.
@@ -512,9 +512,9 @@ postyhNEXTWORD =: 3 : 0
 NB. Accept only if there is a word in the word queue, and if we are in a scorable state
 if. (*@# Gwordqueue) *. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
   NB. Adjust the score
-  Gscore =: (score + Gteamup { score) Gteamup} Gscore
+  Gscore =: (score + Gteamup { Gscore) Gteamup} Gscore
   NB. Move the word from the wordqueue to the turnwordlist
-  turnwordlist =: turnwordlist , ({. Gwordqueue) , <score,retire  NB. put rd/wd/score onto turnlist
+  turnwordlist =: turnwordlist , (<score,retire) 2} {. Gwordqueue  NB. put rd/wd/score onto turnlist
   Gwordqueue =: }. Gwordqueue
   Gwordundook =: *@# turnwordlist  NB. Allow undo if there's something to bring back
   NB. If we are still acting or paused, top up the qword queue
@@ -527,17 +527,17 @@ end.
 )
 
 postyhPREVWORD =: 3 : 0
-NB. If there is a word in the turnlist, and  we are acting or paused, or we are settling and there is time on the clock, accept this command
-if. Gwordundook *. (Gstate e. GSACTING,GSPAUSE) +. (Gstate e. GSSETTLE,GSCONFIRM) *. Gtimedisp>0 do.
+NB. If there is a word in the turnlist, and  we are acting or paused, or we are settling
+if. Gwordundook *. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) do.
   NB. Move tail of turnwords to head of Gwordqueue, adding in the dq info
   tailwd =. {: turnwordlist
-  thisdq =. (((2{.tailwd) -:"1 (2 {."1 dqlist)) # (2 {"1 dqlist)) -. (-.Gteamup) {:: Gteams
+  thisdq =. (((2{.tailwd) -:"1 (2 {."1 dqlist)) # (2 {"1 dqlist)) -. (<Gactor) , (-.Gteamup) {:: Gteams
   Gwordqueue =: Gwordqueue ,~ (2 {. tailwd) , < thisdq
   turnwordlist =: }: turnwordlist
   Gwordundook =: *@# turnwordlist  NB. Allow undo if there's something to bring back
   NB. Undo the score
   score =. (2;0) {:: tailwd  NB. score entered for the word
-  Gscore =: (score -~ Gteamup { score) Gteamup} Gscore
+  Gscore =: (score -~ Gteamup { Gscore) Gteamup} Gscore
   NB. Handle changes of state.
   NB. If we are ACTING or PAUSED, and the new word is for a different round, go to CHANGE state for that round
   NB. If we are SETTLING or CONFIRM, stay in that state until the queue is empty
