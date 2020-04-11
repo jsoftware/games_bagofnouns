@@ -399,12 +399,12 @@ end.
 
 NB. name do/undo  needscorer
 postyhACTOR =: 3 : 0
-NB. Accept if in WACTOR (if type=1) or WSCORER (do=0 and name matches Gactor) or CHANGE (if do=1 and name matches Gactor)
+NB. Accept if in WACTOR (if type=1) or WSCORER (do=0 and name matches Gactor) or CHANGEWACTOR (if do=1 and name matches Gactor)
 'name do needscorer' =. y
-if. do = (1 ,((name-:Gactor) { 2 2,:0 1),2) {~ (GSWACTOR,GSWSCORER,GSCHANGE) i. Gstate do.
+if. do = (1 ,((name-:Gactor) { 2 2,:0 1),2) {~ (GSWACTOR,GSWSCORER,GSCHANGEWACTOR) i. Gstate do.
   if. do do.
     NB. We are accepting a name.  Save it and move to WSCORER or WSTART
-    if. Gstate=GSCHANGE do.
+    if. Gstate=GSCHANGEWACTOR do.
       Gstate =: needscorer { GSCHANGEWSTART,GSCHANGEWSCORER 
     else.
       Gactor =: name
@@ -417,7 +417,7 @@ if. do = (1 ,((name-:Gactor) { 2 2,:0 1),2) {~ (GSWACTOR,GSWSCORER,GSCHANGE) i. 
     end.
     if. -. needscorer do. Gscorer =: name end.
   elseif. Gstate e. GSWSTART,GSWSCORER do.
-    NB. We are taking an undo, necessarily from SCORER to ACTOR.  Forget the actor's name
+    NB. We are taking an undo, necessarily from START/SCORER to ACTOR.  Forget the actor's name
     Gactor =: ''
     Gstate =: GSWACTOR
   end.
@@ -566,16 +566,17 @@ if. Gstate = GSCONFIRM do.
   if. Gtimedisp=0 do.
     NB. if no time left, handle end-of-turn
     NB. Display & Discard words that have been passed twice in a row
-    oldpass =. ((0;0 0) -:"1 (0 2) {"1 prevexposedwords) # 1 {"1 prevexposedwords
-    newpass =. ((0;0 0) -:"1 (0 2) {"1 turnwordlist) # 1 {"1 turnwordlist
+    oldpass =. ((0;0 _1) -:"1 (0 2) {"1 prevexposedwords) # 1 {"1 prevexposedwords
+    newpass =. ((0;0 _1) -:"1 (0 2) {"1 turnwordlist) # 1 {"1 turnwordlist
     retired =. newpass (e. # [) oldpass  NB. words passed twice in a row in the first round
     Glogtext =: Glogtext , ;@:(('discarded: ' , '<br>' ,~ ])&.>) retired
-    turnwordlist =. (retired -.@e.~ 1 {"1 turnwordlist) # turnwordlist
-    wordbag =. (retired -.@e.~ 1 {"1 wordbag) # wordbag
+    turnwordlist =: (retired -.@e.~ 1 {"1 turnwordlist) # turnwordlist
+    wordbag =: (retired -.@e.~ 1 {"1 wordbag) # wordbag
 
     NB. Display & Discard words that have been marked as retired
-    handledmsk =. (2;1)&{::"1 turnwordlist  NB. words we finished
-    Glogtext =: Glogtext , ((2;0)&{::"1 turnwordlist) ;@:(({::&('guessed late: ';'guessed: ')@[ , '<br>' ,~ ])&.>) 1 {"1 turnwordlist
+    handledmsk =. 1 = (2;1)&{::"1 turnwordlist  NB. words we finished
+    htl =. handledmsk # turnwordlist  NB. the woerds we look at now
+    Glogtext =: Glogtext , ((2;0)&{::"1 htl) ;@:(({::&('guessed late: ';'guessed: ')@[ , '<br>' ,~ ])&.>) 1 {"1 htl
     NB. Put the reamining turn words into the exposed list
     exposedwords =: (-. handledmsk) # turnwordlist
   end.
@@ -640,8 +641,8 @@ else.
           Gstate =: GSACTING  NB. continue acting
         end.
       else.
-        NB. Transitioning from some time to no time, i. e. the buzzer sounds.  If the queue is empty, CONFIRM, otherwise SETTLE
-        Gstate =: (*@#Gwordqueue) { GSCONFIRM,GSSETTLE
+        NB. Transitioning from some time to no time, i. e. the buzzer sounds.  If bothing to be scored, CONFIRM, otherwise SETTLE
+        Gstate =: (turnwordlist +.&(*@#) Gwordqueue) { GSCONFIRM,GSSETTLE
       end.
     end.
   end.

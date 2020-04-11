@@ -125,10 +125,12 @@ grid colstretch 0 5; grid colstretch 1 1;
   cc fmgeneral edith;set fmgeneral edit 0;set fmgeneral sizepolicy expanding;set fmgeneral font "Courier New" 32 bold;
   rem row 4: move to the next word;
   bin h;
+   cc fmretire4 button;set fmretire4 sizepolicy expanding;set fmretire4 font "Courier New" 64 bold;set fmretire4 text "Got It Late";
+   cc fmretire3 button;set fmretire3 sizepolicy expanding;set fmretire3 font "Courier New" 64 bold;set fmretire3 text "Time Expired";
    cc fmretire0 button;set fmretire0 sizepolicy expanding;set fmretire0 font "Courier New" 64 bold;set fmretire0 text "Don't Know It"; 
    cc fmretire1 button;set fmretire1 sizepolicy expanding;set fmretire1 font "Courier New" 64 bold;set fmretire1 text "Pass";
    cc fmretire2 button;set fmretire2 sizepolicy expanding;set fmretire2 font "Courier New" 64 bold;set fmretire2 text "Got It";
-  bin z;
+   bin z;
   rem row 5: general purpose buttons;
   bin h;
    cc fmsieze0 button;set fmsieze0 sizepolicy expanding;set fmsieze0 font "Courier New" 32 bold;set fmsieze0 text ""; 
@@ -159,6 +161,8 @@ wd :: 0: 'psel formbon;pclose'
 wd FORMBON
 wd 'set fmretire0 text *Don''t',LF,'Know It'
 wd 'set fmretire2 text *Got',LF,'It'
+wd 'set fmretire4 text *Got',LF,'It',LF,'Late'
+wd 'set fmretire3 text *Time',LF,'Expired'
 wd 'pshow'
 NB. Start a heartbeat
 nextheartbeat =: 6!:1''
@@ -309,7 +313,10 @@ case. GSHELLO do. text =. 'Catching up'
 case. GSLOGINOK do. text =. 'OK to login'
 case. GSAUTH do. text =. 'Waiting for authorization'
 case. GSWORDS do. text =. 'Players are entering words'
-case. GSWACTOR do. text =. 'Need actor for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
+case. GSWACTOR do.
+  NB. will post suggested next player
+  wd 'set fmgeneral text *'
+  text =. 'Need actor for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
 case. GSWSCORER do. text =. 'Need someone to score for ' , Gactor
 case. GSWSTART do. text =. 'Waiting for ' , Gscorer , ' to start the clock'
 case. GSACTING do. text =. Gactor , ' is acting ' , (Groundno {:: 'Taboo';'Charades';'Password') , ' and ' , ((Gactor -.@-: Gscorer) # Gscorer , ' is ') , 'scoring'
@@ -336,7 +343,7 @@ GSWSCORER 'Undo'    'ACTOR '';0;0'
 GSWSTART 'Start the clock'  'ACT 0'
 GSACTING 'Stop the clock'  'TIMERADJ 0;0;'''
 GSPAUSE 'Start the clock'  'TIMERADJ 1;0;'''
-GSSETTLE 'Guessed late:*retire word'   'NEXTWORD 0 1'
+GSSETTLE ''   ''
 GSCONFIRM 'Irrevocably*enter*this score'   'COMMIT 0'
 GSCHANGE 'Yes, proceed' 'PROCEED 0'
 GSCHANGEWACTOR 'I don''t need*a scorer'   'ACTOR '';1;0'
@@ -423,7 +430,7 @@ end.
 
 handGwordundook =: 3 : 0
 if. Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM do.
-  en =. (*@# Gwordqueue) *. ((Gstate e. GSACTING,GSPAUSE) *. Glogin-:Gscorer) +. ((Gstate e. GSSETTLE,GSCONFIRM) *. Glogin-:Gactor)
+  en =. Gwordundook *. ((Gstate e. GSACTING,GSPAUSE) *. Glogin-:Gscorer) +. ((Gstate e. GSSETTLE,GSCONFIRM) *. Glogin-:Gactor)
   wd 'set fmsieze1 enable ',":loggedin*.en
 end.
 ''
@@ -436,6 +443,8 @@ wd 'set fmscore0 text ',(":0 { Gscore),';set fmscore1 text ',":1 { Gscore
 
 handGtimedisp =: 3 : 0
 if. Gstate e. GSWSTART,GSACTING,GSPAUSE,GSSETTLE,GSCHANGE do. wd 'set fmprogress value *',": Gtimedisp end.
+wd 'set fmretire3 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gscorer)
+wd 'set fmretire4 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gscorer)
 ''
 )
 
@@ -509,7 +518,7 @@ backcmd 'RDTIME 1 90'
 i. 0 0
 )
 formbon_fmretire0_button =: 3 : 0
-backcmd 'NEXTWORD 0 0'   NB. score, retirewd
+backcmd 'NEXTWORD 0 _1'   NB. score, retirewd
 i. 0 0
 )
 formbon_fmretire1_button =: 3 : 0
@@ -518,6 +527,14 @@ i. 0 0
 )
 formbon_fmretire2_button =: 3 : 0
 backcmd 'NEXTWORD 1 1'
+i. 0 0
+)
+formbon_fmretire3_button =: 3 : 0
+backcmd 'NEXTWORD 0 0'
+i. 0 0
+)
+formbon_fmretire4_button =: 3 : 0
+backcmd 'NEXTWORD 0 1'
 i. 0 0
 )
 formbon_fmsieze0_button =: 3 : 0
