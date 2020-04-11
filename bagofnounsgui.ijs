@@ -180,7 +180,7 @@ smoutput'data from BE '
   hdr =. ''   NB. No data, no bytes of header
   while. do.   NB. Read all the commands that are queued
     NB. There is data to read.  Read it all, until we have the complete message.  First 4 bytes are the length
-    while. do.
+    while. 4>#hdr do.
       'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
       if. rc~:0 do. 'Error reading from background' 13!:8 (4) end.
       if. 0=#data do. 'Connection closed by background, restart' 13!:8 (5) end.
@@ -215,6 +215,7 @@ i. 0 0
 
 NB. Send the command in y, prefixed by length
 backcmd =: 3 : 0
+if. #y do. smoutput 'backcmd: ' , y end. NB. scaf
 senddata =. (2 (3!:4) #y) , y   NB. prefix the data with 4-byte length
 while. #senddata do.
   if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';1000 do. 'Error writing to background' 13!:8 (4) end.
@@ -535,7 +536,7 @@ wds =. wds -. a:  NB. Remove empty words
 if. 0=#wds do. wd'mb info mb_ok "No words" "You didn''t put any words on the clipboard."' return. end.
 if. 15<#wds do. wd'mb info mb_ok "Too many words" "You have too many words."' return. end.
 if. 30 < >./ #@> wds do. wd'mb info mb_ok "Too long" "One of your words is too long."' return. end.
-if. 'ok' -: wd'mb query mb_ok "Is this word list OK?" *', ; ,&LF&.> wds do.
+if. 'ok' -: tmb   =: wd'mb query mb_ok "Is this word list OK?" *', ; ,&LF&.> wds do.
   backcmd 'WORDS ''',Glogin,''' ,&< ' , 5!:5 <'wds'
 end.
 )

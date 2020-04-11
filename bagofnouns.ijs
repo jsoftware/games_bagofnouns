@@ -71,11 +71,12 @@ if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.  NB. allow long time for dia
   return.  NB. scaf
   smoutput 'heartbeat lost' return. 
 end.
+smoutput 'read'
 NB. There is data to read.  Read it all, until we have the complete message(s).  First 4 bytes are the length
 hdr =. ''   NB. No data, no bytes of header
 cmdqueue =. 0$a:  NB. List of commands
 while. do.
-  while. do.
+  while. 4>#hdr do.
     'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
     if. 0{::rc do. 'Error ',(":0{::rc),' reading from frontend' 13!:8 (4) end.
     if. 0=#data do. feconnlost=.1 break. end.
@@ -101,7 +102,7 @@ while. do.
   hdr =. hlen {. readdata  NB. transfer the length
   if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.5 break. end.
 end.
-if. feconnlost do. return. end.
+if. feconnlost do. smoutput feconnlost  return. end.
 NB. perform pre-sync command processing
 if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
 senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('INCR "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
@@ -199,7 +200,7 @@ if. 0 do.
 else.
   NB. debug version using timer
   timerpms =: qbm;sk;tourn;password
-  wd 'timer 100'
+  wd 'timer 1000'
 end.
 return.  NB. scaf
 end.
