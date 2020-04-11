@@ -161,6 +161,7 @@ if. #data do. qprintf'data 'end.
     diffs =. (chgmsk # gblifnames) ,. chgmsk # gbls
     Ggbls =: gbls  NB. save old state
     if. #diffs do.
+qprintf'diffs '
       chg =. 5!:5 <'diffs'  NB. Get data to send
       senddata =. (2 (3!:4) #chg) , chg   NB. prepend length
       while. #senddata do.
@@ -294,7 +295,7 @@ res
 NB. y is sequence or CRLF-delimited commands from the server.  We process them one by one,
 NB. making changes to the globals as we go.  Then, we send the changed globals to the FE.
 postsync =: 3 : 0
-Glogtext =: Glogtext , y  NB. scaf
+if. #y do. Glogtext =: Glogtext , y , '<br>' end.  NB. scaf
 ".@('postyh'&,);._2 y -. CR   NB. run em all
 NB. Send the changed names
 i. 0 0

@@ -144,6 +144,7 @@ pas 0 0;
 )
 cleargame=:0
 formbon_run =: 3 : 0
+sdcleanup_jsocket_''
 NB. Connect to the background
 sk =: 1 {:: sdsocket_jsocket_ ''
 thismachine =: sdgethostbyname_jsocket_ 'localhost'
@@ -451,6 +452,11 @@ if. adjn do. backcmd 'SCOREADJ 1;',adj,';''',Glogin'''' end.
 i. 0 0
 )
 formbon_fmteamshow_button =: 3 : 0
+if. 1=#Gteams do.
+  wd 'mb info mb_ok "Teams Not Assigned Yet" *The players are:',LF,LF, ; ,&LF&.> ; Gteams
+elseif. 2=#Gteams do.
+  wd 'mb info mb_ok "Teams" *' , , ,&LF"1 (,. '  ' ,"1 ])&:>/ (a: ,.~ 'Team 0';'Team 1')  ,. > Gteams
+end.
 i. 0 0
 )
 formbon_fmawaybrb_button =: 3 : 0
