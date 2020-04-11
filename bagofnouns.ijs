@@ -282,7 +282,7 @@ NB. If we are the actor, change the tick to a TICK
 res =. rejcmd
 rejcmd =: ''  NB. It's a one-shot
 if. (Glogin -: Gactor) do.
-  if. (Gstate = GSACTING) *. (Gtimedisp>0) do. res =. res , 'TICK',CRLF end.
+  if. (Gstate = GSACTING) *. (Gtimedisp>0) do. res =. res , 'TICK 0',CRLF end.
 end.
 if. #ourloginname do. if. (ourlogintime~:0) *. (6!:1'')>ourlogintime+4 do.
   Glogin=:ourloginname

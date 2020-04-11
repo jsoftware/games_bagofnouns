@@ -409,12 +409,12 @@ handGwordqueue =: 3 : 0
 if. Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM do.
   if. Glogin -: Gactor do.
     if. #Gwordqueue do.
-      wd 'set fmgeneral text *', ; ,&'<br>'&.> {."1 Gwordqueue
+      wd 'set fmgeneral text *', ; ,&'<br>'&.> 1 {"1 Gwordqueue
     else.
       wd 'set fmgeneral text *No more words'
     end.
   else.
-    if. #Gwordqueue do. text =. 'DQ: ' , ;:^:_1 (<0 1) {:: Gwordqueue else. text =. '' end.
+    if. #Gwordqueue do. text =. 'DQ: '&,^:(*@#) ;:^:_1 (<0 2) {:: Gwordqueue else. text =. '' end.
     wd 'set fmgeneral text *' , text
   end.
 end.
