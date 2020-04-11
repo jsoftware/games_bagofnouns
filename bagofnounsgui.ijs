@@ -318,17 +318,23 @@ case. GSWACTOR do.
   wd 'set fmgeneral text *'
   text =. 'Need actor for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
 case. GSWSCORER do. text =. 'Need someone to score for ' , Gactor
-case. GSWSTART do. text =. 'Waiting for ' , Gscorer , ' to start the clock'
+case. GSWSTART do.
+  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'You may fire when you are ready, Gridley.'
+  text =. 'Waiting for ' , Gscorer , ' to start the clock'
 case. GSACTING do. text =. Gactor , ' is acting ' , (Groundno {:: 'Taboo';'Charades';'Password') , ' and ' , ((Gactor -.@-: Gscorer) # Gscorer , ' is ') , 'scoring'
 case. GSPAUSE do. text =. 'Clock is stopped while ' , Gactor , ' is acting ' , (Groundno {:: 'Taboo';'Charades';'Password')
 case. GSSETTLE do. text =. Gactor , ' is entering scores for the last words'
 case. GSCONFIRM do. text =. 'Last chance to change the scores and words for this round'
 case. GSCHANGE do.
-  wd 'set fmgeneral text *Round change!  You will be acting ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
+  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Round change!  You will be acting ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
   text =. 'Changing to ' , Groundno {:: 'Taboo';'Charades';'Password';'Scotch'
-case. GSCHANGEWACTOR do. text =. 'Is a scorer needed?' 
+case. GSCHANGEWACTOR do.
+  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Do you want a scorer for the ',(Groundno {:: 'Taboo';'Charades';'Password'),' round?'
+  text =. 'Does ' , Gactor , ' need a scorer for ',(Groundno {:: 'Taboo';'Charades';'Password'),'?' 
 case. GSCHANGEWSCORER do. text =. 'Need someone to score for ' , Gactor
-case. GSCHANGEWSTART do. text =. 'Waiting for ' , Gscorer , ' to start the clock'
+case. GSCHANGEWSTART do.
+  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'You may fire when you are ready, Gridley.'
+  text =. 'Waiting for ' , Gscorer , ' to start the clock'
 case. GSGAMEOVER do. text =. 'Game Over'
 case. do. text =. ''
 end.
@@ -339,7 +345,7 @@ wd 'set fmstatus text *', text
 buttoncaptions0 =: (<@;)`(<@(,&a:))`(<@(,&a:))"1 ".&.> |: ;:@(LF&(('*'&(I.@:=)@])}));._2 DD   =: (0 : 0)
 GSWORDS 'Enter Words*From Clipboard' ''
 GSWACTOR 'I will act*and score' 'ACTOR '';1;0'
-GSWSCORER 'Undo'    'ACTOR '';0;0'
+GSWSCORER 'Undo!  I don''t*want to act'    'ACTOR '';0;0'
 GSWSTART 'Start the clock'  'ACT 0'
 GSACTING 'Stop the clock'  'TIMERADJ 0;0;'''
 GSPAUSE 'Start the clock'  'TIMERADJ 1;0;'''
@@ -361,7 +367,7 @@ GSCONFIRM 'Undo last word'  'PREVWORD 0'
 GSCHANGE '' ''
 GSCHANGEWACTOR 'I need*a scorer'   'ACTOR '';1;1'
 GSCHANGEWSCORER 'I will score'  'SCORER '';1'
-GSCHANGEWSTART 'Undo'  'SCORER '';0'
+GSCHANGEWSTART 'Undo!  I don''t*want to score'  'SCORER '';0'
 )
 
 handGteams =: 3 : 0

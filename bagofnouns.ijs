@@ -106,6 +106,7 @@ NB. perform pre-sync command processing
 if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
 senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('INCR "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
 NB. Create a connection to the server and send all the data in an INCR command
+sendstarttime =. 6!:1''  NB. scaf
 for_dly. 1000 1000 1000 do.
   NB.?lintloopbodyalways
   ssk =. 1 {:: sdsocket_jsocket_ ''  NB. listening socket
@@ -144,6 +145,7 @@ while. do.
   if. 0=#data do. break. end.  NB. Normal exit: host closes connection
   readdata =. readdata , data  NB. Accumulate reply
 end.
+if. 0.3 < sendstarttime =. (6!:1'') - sendstarttime do. smoutput 'server delay=',":sendstarttime end.  NB. scaf
 sdclose_jsocket_ ssk
 if. #readdata do.
   NB. Verify response validity.
@@ -410,7 +412,7 @@ if. do = (1 ,((name-:Gactor) { 2 2,:0 1),2) {~ (GSWACTOR,GSWSCORER,GSCHANGEWACTO
       Gactor =: name
       NB. If we changing rounds, interpolate CHANGE state
       if. Groundno ~: nextroundno'' do.
-        Groundno = nextroundno''
+        Groundno =: nextroundno''
         Gstate =: GSCHANGE
       else. Gstate =: needscorer { GSWSTART,GSWSCORER
       end.
@@ -540,10 +542,11 @@ if. Gwordundook *. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) do.
   Gscore =: (score -~ Gteamup { Gscore) Gteamup} Gscore
   NB. Handle changes of state.
   NB. If we are ACTING or PAUSED, and the new word is for a different round, go to CHANGE state for that round
-  NB. If we are SETTLING or CONFIRM, stay in that state until the queue is empty
   if. (Gstate e. GSACTING,GSPAUSE) *. Groundno ~: (<0 0) {:: Gwordqueue do.
     Groundno =: (<0 0) {:: Gwordqueue  NB. set new round before CHANGE
     Gstate =: GSCHANGE
+  NB. If we are SETTLING or CONFIRM, go into SETTLE until the queue is empty
+  elseif. Gstate = GSCONFIRM do. Gstate =: GSSETTLE
   end.
 end.
 ''
