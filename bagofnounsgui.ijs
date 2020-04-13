@@ -320,19 +320,19 @@ case. GSWORDS do. text =. 'Players are entering words'
 case. GSWACTOR do.
   NB. will post suggested next player
   wd 'set fmgeneral text *Next up: ' , ((Gteamup;0) {:: Gteams) , ' then ' , ((Gteamup;1) {:: Gteams)
-  text =. 'Need actor for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
+  text =. 'Need player for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
 case. GSWSCORER do. text =. 'Need someone to score for ' , Gactor
 case. GSWSTART do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'You may fire when you are ready, Gridley.'
   text =. 'Waiting for ' , Gscorer , ' to start the clock'
-case. GSACTING do. text =. Gactor , ' is acting ' , (Groundno {:: 'Taboo';'Charades';'Password') , ' and ' , ((Gactor -.@-: Gscorer) # Gscorer , ' is ') , 'scoring'
-case. GSPAUSE do. text =. 'Clock is stopped while ' , Gactor , ' is acting ' , (Groundno {:: 'Taboo';'Charades';'Password')
+case. GSACTING do. text =. Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password') , ' and ' , ((Gactor -.@-: Gscorer) # Gscorer , ' is ') , 'scoring'
+case. GSPAUSE do. text =. 'Clock is stopped while ' , Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password')
 case. GSSETTLE do. text =. Gactor , ' is entering scores for the last words'
 case. GSCONFIRM do.
   wd 'set fmgeneral text *Don''t go away - new round coming right up'
   text =. 'Last chance to change the scores and words for this round'
 case. GSCHANGE do.
-  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Round change!  You will be acting ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
+  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Round change!  You will be playing ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
   text =. 'Changing to ' , Groundno {:: 'Taboo';'Charades';'Password';'Scotch'
 case. GSCHANGEWACTOR do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Do you want a scorer for the ',(Groundno {:: 'Taboo';'Charades';'Password'),' round?'
@@ -350,8 +350,8 @@ wd 'set fmstatus text *', text
 )
 buttoncaptions0 =: (<@;)`(<@(,&a:))`(<@(,&a:))"1 ".&.> |: ;:@(LF&(('*'&(I.@:=)@])}));._2 (0 : 0)
 GSWORDS 'Enter Words*From Clipboard' ''
-GSWACTOR 'I will act*and score' 'ACTOR '';1;0'
-GSWSCORER 'Undo!  I don''t*want to act'    'ACTOR '';0;0'
+GSWACTOR 'I will play*and score' 'ACTOR '';1;0'
+GSWSCORER 'Undo!  I don''t*want to play'    'ACTOR '';0;0'
 GSWSTART 'Start the clock'  'ACT 0'
 GSACTING 'Stop the clock'  'TIMERADJ 0;0;'''
 GSPAUSE 'Start the clock'  'TIMERADJ 1;0;'''
@@ -363,7 +363,7 @@ GSCHANGEWSCORER ''    ''
 GSCHANGEWSTART 'Start the clock'  'ACT 0'
 )
 buttoncaptions1 =: (<@;)`(<@(,&a:))`(<@(,&a:))"1 ".&.> |: ;:@(LF&(('*'&(I.@:=)@])}));._2 (0 : 0)
-GSWACTOR 'I will act*but I need*a scorer' 'ACTOR '';1;1'
+GSWACTOR 'I will play*but I need*a scorer' 'ACTOR '';1;1'
 GSWSCORER 'I will score'  'SCORER '';1'
 GSWSTART 'Undo'  'SCORER '';0'
 GSACTING 'Undo last word' 'PREVWORD 0'
@@ -448,7 +448,7 @@ handGwordqueue =: 3 : 0
 if. Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM do.
   if. Glogin -: Gactor do.
     NB. Special display for the actor.  Prefix it with instructions
-    text =. ((GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) i. Gstate){'Act these words in order:';'Clock is stopped - wait';'Score the word in red, or undo to change an earlier word:';'Enter when you are sure the score is right.'
+    text =. ((GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) i. Gstate){'Play these words in order:';'Clock is stopped - wait';'Score the word in red, or undo to change an earlier word:';'Enter when you are sure the score is right.'
     if. #Gwordqueue do.
       NB. Show the queue, with an indication of how the words were scored, if they were
       words =. 1 {"1 Gwordqueue
@@ -464,13 +464,13 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM do.
     if. Gstate e. GSACTING,GSPAUSE do.
       if. #Gwordqueue do.
         NB. See who is DQd from the acting team
-        dqplrs =. (((<0;0 1) { Gwordqueue) -:"1 (2 {."1 Gdqlist)) # 2 {."1 Gdqlist 
+        dqplrs =. (((<0;0 1) { Gwordqueue) -:"1 (2 {."1 Gdqlist)) # 2 {"1 Gdqlist 
         text =. 'DQ: '&,^:(*@#) ;:^:_1 dqplrs -. ((-. Gteamup) {:: Gteams) , <Gactor 
       else. text =. ''
       end.
       wd 'set fmgeneral text *' , text
     else.
-      wd 'set fmgeneral text *Turn is over'
+      wd 'set fmgeneral text *' , (*Gtimedisp) {:: 'Turn is over';'Scoring break, turn will continue'
     end.
   end.
 end.
