@@ -319,7 +319,7 @@ case. GSAUTH do. text =. 'Waiting for authorization'
 case. GSWORDS do. text =. 'Players are entering words'
 case. GSWACTOR do.
   NB. will post suggested next player
-  wd 'set fmgeneral text *'
+  wd 'set fmgeneral text *Next up: ' , ((Gteamup;0) {:: Gteams) , ' then ' , ((Gteamup;1) {:: Gteams)
   text =. 'Need actor for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
 case. GSWSCORER do. text =. 'Need someone to score for ' , Gactor
 case. GSWSTART do.
@@ -453,7 +453,7 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM do.
       NB. Show the queue, with an indication of how the words were scored, if they were
       words =. 1 {"1 Gwordqueue
       scoretag =. ((0 _1;_1 0;1 1;0 0;0 1) i. 2 {"1 Gwordqueue) { ' (didn''t know it)';' (passed -1)';' (scored +1)';' (time expired)';' (guessed late)';''
-      if. (Gstate=GSSETTLE) *. *@#words do. words =. (('<color=red>' , ,&'</color>')&.> {. words) 0} words end.
+      if. (Gstate=GSSETTLE) *. *@#words do. words =. (('<font color=red>' , ,&'</font>')&.> {. words) 0} words end.
       text =. text , <@;"1 words,.scoretag
     else.
       NB. No words should be possible only in CONFIRM state

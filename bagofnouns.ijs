@@ -395,6 +395,7 @@ NB.?lintonly dqlist =: ,: 1;'word';'name'
 NB. Gwordqueue =: ,: '1';'word';< ,<'dq'
   Groundno =: 0
   Gstate=:GSWACTOR
+  Gtimedisp =: 0
 NB.?lintsaveglobals
 ''
 end.
@@ -418,7 +419,7 @@ if. do = (1 ,((name-:Gactor) { 2 2,:0 1),2) {~ (GSWACTOR,GSWSCORER,GSCHANGEWACTO
       else. Gstate =: needscorer { GSWSTART,GSWSCORER
       end.
     end.
-    if. -. needscorer do. Gscorer =: name end.
+    Gscorer =: needscorer {:: name;''
   elseif. Gstate e. GSWSTART,GSWSCORER do.
     NB. We are taking an undo, necessarily from START/SCORER to ACTOR.  Forget the actor's name
     Gactor =: ''
@@ -430,9 +431,9 @@ end.
 
 NB. name do/undo
 postyhSCORER =: 3 : 0
-NB. Accept if in WSCORER or CHANGEWSCORER (type=1) or WSTART or CHANGEWSTART (type=0 & name match)
+NB. Accept if in WSCORER or CHANGEWSCORER (type=1) or WSTART or CHANGEWSTART (type=0 & actor or scorer)
 'name do' =. y
-if. do = (1 0 ,((name-:Gscorer) { 2 2,:0 0),2) {~ (GSWSCORER,GSCHANGEWSCORER,GSWSTART,GSCHANGEWSTART) i. Gstate do.
+if. do = (1 0 ,(((<name) e. Gscorer;Gactor) { 2 2,:0 0),2) {~ (GSWSCORER,GSCHANGEWSCORER,GSWSTART,GSCHANGEWSTART) i. Gstate do.
   if. do do.
     Gscorer =: name
     Gstate =: (Gstate=GSWSCORER) { GSCHANGEWSTART,GSWSTART
@@ -440,6 +441,10 @@ if. do = (1 0 ,((name-:Gscorer) { 2 2,:0 0),2) {~ (GSWSCORER,GSCHANGEWSCORER,GSW
     NB. It's an undo
     Gscorer =: ''
     Gstate =: (Gstate=GSWSTART) { GSCHANGEWSCORER,GSWSCORER
+    if. name-:Gactor do.   NB. If actor quails, go back to WACTOR
+      Gactor =: ''
+      Gstate =: (Gstate=GSWSCORER) { GSCHANGEWACTOR,GSWACTOR
+    end.
   end.
 end.
 ''
@@ -458,6 +463,8 @@ if. Gstate e. GSWSTART,GSCHANGEWSTART do.
     NB.?lintonly turnwordlist =: ,: 1;'word';1 1
     NB. We save a copy of the exposedwords before we start so that we can delete words dismissed twice in a row
     prevexposedwords =: exposedwords
+    NB. Move the acting player to the bottom of the priority list
+    Gteams =: (< (Gteamup {:: Gteams) (-. , ]) <Gactor) Gteamup} Gteams
     NB.?lintonly prevexposedwords =: ,: 1;'word';1 1
     NB.?lintsaveglobals
   end.
@@ -595,7 +602,7 @@ if. Gstate = GSCONFIRM do.
     Groundno =: nextroundno''  NB. set new round# before going to CHANGE state
   else.
     NB. Should be out of time, since there are no words to act.  Clear time just in case, and go look for next actor, from the other team
-    Gtimedisp =: 0 [ Gteamup =: -. Gteamup [ Gstate =: GSWACTOR
+    Gtimedisp =: 0 [ Gteamup =: -. Gteamup [ Gstate =: GSWACTOR [ Groundno =: nextroundno''
   end. 
 end.
 ''
