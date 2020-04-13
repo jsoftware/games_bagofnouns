@@ -202,7 +202,7 @@ if. 0 do.
 else.
   NB. debug version using timer
   timerpms =: qbm;sk;tourn;password
-  wd 'timer 1000'
+  wd 'timer 50'
 end.
 return.  NB. scaf
 end.
@@ -221,7 +221,7 @@ i. 0 0
 sys_timer_z_ =: sys_timer_base_
 
 
-gblifnames =: ;:'Gstate Gscore Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin'
+gblifnames =: ;:'Gstate Gscore Gdqlist Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin'
 
 NB. Initial settings for globals shared with FE
 initstate =: 3 : 0
@@ -244,6 +244,7 @@ inithwmk =: 0
 ourloginname =: ''
 rejcmd =: ''  NB. set to a LOGINREJ cmd if we need one
 Ggbls =: 0:"0 gblifnames  NB. Init old copy = something that never matches a boxed value
+Gdqlist =. 0 3$a:
 NB.?lintsaveglobals
 )
 initstate''
@@ -386,8 +387,8 @@ NB.?lintonly wordbag =: ,: 1;'word'
   NB. round;word;score (where score of 0 0 means don't know)
   exposedwords =: 0 3$a:
 NB.?lintonly exposedwords =: ,: 1;'word';1 1
-  NB. dqlist is a list of round;word;name for every time a word is added to the exposedwords
-  dqlist =: 0 3$a:
+  NB. Gdqlist is a list of round;word;name for every time a word is added to the exposedwords
+  Gdqlist =: 0 3$a:
 NB.?lintonly dqlist =: ,: 1;'word';'name'
   NB. Gwordqueue is a list of round;word;dqlist where each word is in Groundno.  These words are exposed to the actor
   Gwordqueue =: 0 3$a:
@@ -484,10 +485,8 @@ while. 2 > #Gwordqueue do.
   end. end.
   NB. If there is no word to add, exit
   if. 0=#nextrdwd do. break. end.
-  NB. Expose the word.  Add the actor to the dqlist for the word
-  thisdq =. ((nextrdwd -:"1 (2 {."1 dqlist)) # (2 {"1 dqlist)) -. (<Gactor) , (-.Gteamup) {:: Gteams
-  Gwordqueue =: Gwordqueue , nextrdwd , < thisdq
-  dqlist =: dqlist , nextrdwd , < Gactor
+  NB. Expose the word, with no scoring
+  Gwordqueue =: Gwordqueue , nextrdwd , a:
 end.
 ''
 )
@@ -533,8 +532,7 @@ NB. If there is a word in the turnlist, and  we are acting or paused, or we are 
 if. Gwordundook *. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) do.
   NB. Move tail of turnwords to head of Gwordqueue, adding in the dq info
   tailwd =. {: turnwordlist
-  thisdq =. (((2{.tailwd) -:"1 (2 {."1 dqlist)) # (2 {"1 dqlist)) -. (<Gactor) , (-.Gteamup) {:: Gteams
-  Gwordqueue =: Gwordqueue ,~ (2 {. tailwd) , < thisdq
+  Gwordqueue =: Gwordqueue ,~ tailwd
   turnwordlist =: }: turnwordlist
   Gwordundook =: *@# turnwordlist  NB. Allow undo if there's something to bring back
   NB. Undo the score
@@ -566,8 +564,6 @@ NB. Accept if in CONFIRM state
 if. Gstate = GSCONFIRM do.
   NB. If exposed and bag are empty, this actor gets no more words, so take the time away
   if. exposedwords +:&(*@#) wordbag do. Gtimedisp =. 0 end.
-  if. Gtimedisp=0 do.
-    NB. if no time left, handle end-of-turn
     NB. Display & Discard words that have been passed twice in a row
     oldpass =. ((0;0 _1) -:"1 (0 2) {"1 prevexposedwords) # 1 {"1 prevexposedwords
     newpass =. ((0;0 _1) -:"1 (0 2) {"1 turnwordlist) # 1 {"1 turnwordlist
@@ -575,13 +571,20 @@ if. Gstate = GSCONFIRM do.
     Glogtext =: Glogtext , ;@:(('discarded: ' , '<br>' ,~ ])&.>) retired
     turnwordlist =: (retired -.@e.~ 1 {"1 turnwordlist) # turnwordlist
     wordbag =: (retired -.@e.~ 1 {"1 wordbag) # wordbag
+    Gdqlist =: (retired -.@e.~ 1 {"1 Gdqlist) # Gdqlist
 
     NB. Display & Discard words that have been marked as retired
     handledmsk =. 1 = (2;1)&{::"1 turnwordlist  NB. words we finished
-    htl =. handledmsk # turnwordlist  NB. the woerds we look at now
+    Gdqlist =: ((2 {."1 Gdqlist) -.@e. (handledmsk # 2 {."1 turnwordlist)) # Gdqlist  NB. Remove words we are showing now
+    htl =. handledmsk # turnwordlist  NB. the words we show everyone now
     Glogtext =: Glogtext , ((2;0)&{::"1 htl) ;@:(({::&('guessed late: ';'guessed: ')@[ , '<br>' ,~ ])&.>) 1 {"1 htl
-    NB. Put the reamining turn words into the exposed list
-    exposedwords =: (-. handledmsk) # turnwordlist
+    turnwordlist =: (-. handledmsk) # turnwordlist  NB. The  words have now passed on
+  if. Gtimedisp=0 do.
+    NB. if no time left, handle end-of-turn
+    NB. Put the remaining turn words into the exposed list
+    exposedwords =: turnwordlist
+    NB. Also into the dqlist for the player who saw them
+    Gdqlist =: Gdqlist , (<Gactor) (<a:;2)} turnwordlist
   end.
   NB. Figure next state:
   NB. GAMEOVER if the exposed and bag are still empty

@@ -237,7 +237,7 @@ i. 0 0
 )
 
 NB. Order of processing state info
-statepri =: (;: 'Glogin Groundtimes Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordqueue Gwordundook Gscore Gtimedisp')
+statepri =: (;: 'Glogin Groundtimes Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordqueue Gwordundook Gscore Gtimedisp')
 NB. Process the command queue, which is a list of boxes.  Each box contains
 NB. the 5!:5 of a table of state information, as
 NB. infotype ; value
@@ -266,6 +266,10 @@ wd 'set fmloggedin text *', ('nobody'&[^:(0=#) Glogin) , ' is logged in'
 handGroundtimes =: 3 : 0
 wd 'set fmcharades60 checked ' , ": 60 = 1 { Groundtimes
 wd 'set fmcharades90 checked ' , ": 90 = 1 { Groundtimes
+''
+)
+
+handGdqlist =: 3 : 0
 ''
 )
 
@@ -324,7 +328,9 @@ case. GSWSTART do.
 case. GSACTING do. text =. Gactor , ' is acting ' , (Groundno {:: 'Taboo';'Charades';'Password') , ' and ' , ((Gactor -.@-: Gscorer) # Gscorer , ' is ') , 'scoring'
 case. GSPAUSE do. text =. 'Clock is stopped while ' , Gactor , ' is acting ' , (Groundno {:: 'Taboo';'Charades';'Password')
 case. GSSETTLE do. text =. Gactor , ' is entering scores for the last words'
-case. GSCONFIRM do. text =. 'Last chance to change the scores and words for this round'
+case. GSCONFIRM do.
+  wd 'set fmgeneral text *Don''t go away - new round coming right up'
+  text =. 'Last chance to change the scores and words for this round'
 case. GSCHANGE do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Round change!  You will be acting ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
   text =. 'Changing to ' , Groundno {:: 'Taboo';'Charades';'Password';'Scotch'
@@ -342,7 +348,7 @@ end.
 wd 'set fmstatus text *', text
 ''
 )
-buttoncaptions0 =: (<@;)`(<@(,&a:))`(<@(,&a:))"1 ".&.> |: ;:@(LF&(('*'&(I.@:=)@])}));._2 DD   =: (0 : 0)
+buttoncaptions0 =: (<@;)`(<@(,&a:))`(<@(,&a:))"1 ".&.> |: ;:@(LF&(('*'&(I.@:=)@])}));._2 (0 : 0)
 GSWORDS 'Enter Words*From Clipboard' ''
 GSWACTOR 'I will act*and score' 'ACTOR '';1;0'
 GSWSCORER 'Undo!  I don''t*want to act'    'ACTOR '';0;0'
@@ -356,7 +362,7 @@ GSCHANGEWACTOR 'I don''t need*a scorer'   'ACTOR '';1;0'
 GSCHANGEWSCORER ''    ''
 GSCHANGEWSTART 'Start the clock'  'ACT 0'
 )
-buttoncaptions1 =: (<@;)`(<@(,&a:))`(<@(,&a:))"1 ".&.> |: ;:@(LF&(('*'&(I.@:=)@])}));._2 DD   =: (0 : 0)
+buttoncaptions1 =: (<@;)`(<@(,&a:))`(<@(,&a:))"1 ".&.> |: ;:@(LF&(('*'&(I.@:=)@])}));._2 (0 : 0)
 GSWACTOR 'I will act*but I need*a scorer' 'ACTOR '';1;1'
 GSWSCORER 'I will score'  'SCORER '';1'
 GSWSTART 'Undo'  'SCORER '';0'
@@ -417,18 +423,54 @@ handGlogtext =: 3 : 0
 wd 'set fmlog text *',Glogtext
 ''
 )
+ormbon_fmretire0_button =: 3 : 0
+backcmd 'NEXTWORD 0 _1'   NB. score, retirewd
+i. 0 0
+)
+formbon_fmretire1_button =: 3 : 0
+backcmd 'NEXTWORD _1 0'
+i. 0 0
+)
+formbon_fmretire2_button =: 3 : 0
+backcmd 'NEXTWORD 1 1'
+i. 0 0
+)
+formbon_fmretire3_button =: 3 : 0
+backcmd 'NEXTWORD 0 0'
+i. 0 0
+)
+formbon_fmretire4_button =: 3 : 0
+backcmd 'NEXTWORD 0 1'
+i. 0 0
 
 handGwordqueue =: 3 : 0
 if. Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM do.
   if. Glogin -: Gactor do.
+    NB. Special display for the actor.  Prefix it with instructions
+    text =. ((GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) i. Gstate){'Act these words in order:';'Clock is stopped - wait';'Score the word in red, or undo to change an earlier word:';'Enter when you are sure the score is right.'
     if. #Gwordqueue do.
-      wd 'set fmgeneral text *', ; ,&'<br>'&.> 1 {"1 Gwordqueue
+      NB. Show the queue, with an indication of how the words were scored, if they were
+      words =. 1 {"1 Gwordqueue
+      scoretag =. ((0 _1;_1 0;1 1;0 0;0 1) i. 2 {"1 Gwordqueue) { ' (didn''t know it)';' (passed -1)';' (scored +1)';' (time expired)';' (guessed late)';''
+      if. (Gstate=GSSETTLE) *. #words) do. words =. (('<color=red>' , ,&'</color>')&.> {. words) 0} words end.
+      text =. text , <@;"1 words,.scoretag
     else.
-      wd 'set fmgeneral text *No more words'
+      NB. No words should be possible only in CONFIRM state
     end.
+    wd 'set fmgeneral text *' , ; ,&'<br>'&.> text
   else.
-    if. #Gwordqueue do. text =. 'DQ: '&,^:(*@#) ;:^:_1 (<0 2) {:: Gwordqueue else. text =. '' end.
-    wd 'set fmgeneral text *' , text
+    NB. For non-actors, indicate DQ status for the word, if there is still time
+    if. Gstate e. GSACTING,GSPAUSE do.
+      if. #Gwordqueue do.
+        NB. See who is DQd from the acting team
+        dqplrs =. (((<0;0 1) { Gwordqueue) -:"1 (2 {."1 Gdqlist)) # 2 {."1 Gdqlist 
+        text =. 'DQ: '&,^:(*@#) ;:^:_1 dqplrs -. ((-. Gteamup) {:: Gteams) , <Gactor 
+      else. text =. ''
+      end.
+      wd 'set fmgeneral text *' , text
+    else.
+      wd 'set fmgeneral text *Turn is over'
+    end.
   end.
 end.
 ''
