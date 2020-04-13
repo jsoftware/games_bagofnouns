@@ -453,7 +453,7 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM do.
       NB. Show the queue, with an indication of how the words were scored, if they were
       words =. 1 {"1 Gwordqueue
       scoretag =. ((0 _1;_1 0;1 1;0 0;0 1) i. 2 {"1 Gwordqueue) { ' (didn''t know it)';' (passed -1)';' (scored +1)';' (time expired)';' (guessed late)';''
-      if. (Gstate=GSSETTLE) *. #words) do. words =. (('<color=red>' , ,&'</color>')&.> {. words) 0} words end.
+      if. (Gstate=GSSETTLE) *. *@#words do. words =. (('<color=red>' , ,&'</color>')&.> {. words) 0} words end.
       text =. text , <@;"1 words,.scoretag
     else.
       NB. No words should be possible only in CONFIRM state
