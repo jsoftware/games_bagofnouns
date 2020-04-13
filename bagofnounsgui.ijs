@@ -442,7 +442,7 @@ i. 0 0
 formbon_fmretire4_button =: 3 : 0
 backcmd 'NEXTWORD 0 1'
 i. 0 0
-
+)
 
 handGwordqueue =: 3 : 0
 if. Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM do.
