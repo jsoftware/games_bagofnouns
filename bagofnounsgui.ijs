@@ -329,8 +329,10 @@ case. GSACTING do. text =. Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Char
 case. GSPAUSE do. text =. 'Clock is stopped while ' , Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password')
 case. GSSETTLE do. text =. Gactor , ' is entering scores for the last words'
 case. GSCONFIRM do.
-  wd 'set fmgeneral text *Don''t go away - new round coming right up'
-  text =. 'Last chance to change the scores and words for this round'
+  NB. Extract the words that have been retired
+  rwords =. 2 {"1 (#~ 1 = (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words
+  wd 'set fmgeneral text *words: ', _2 }. ,&', '&.> rwords
+  text =. 'Check the score and see the words'
 case. GSCHANGE do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Round change!  You will be playing ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
   text =. 'Changing to ' , Groundno {:: 'Taboo';'Charades';'Password';'Scotch'
@@ -349,14 +351,14 @@ wd 'set fmstatus text *', text
 ''
 )
 buttoncaptions0 =: (<@;)`(<@(,&a:))`(<@(,&a:))"1 ".&.> |: ;:@(LF&(('*'&(I.@:=)@])}));._2 (0 : 0)
-GSWORDS 'Enter Words*From Clipboard' ''
+GSWORDS 'Enter Words*From Clipboard' 'W'
 GSWACTOR 'I will play*and score' 'ACTOR '';1;0'
 GSWSCORER 'Undo!  I don''t*want to play'    'ACTOR '';0;0'
 GSWSTART 'Start the clock'  'ACT 0'
 GSACTING 'Stop the clock'  'TIMERADJ 0;0;'''
 GSPAUSE 'Start the clock'  'TIMERADJ 1;0;'''
-GSSETTLE ''   ''
-GSCONFIRM 'Irrevocably*enter*this score'   'COMMIT 0'
+GSSETTLE 'See all*the words'   'S'
+GSCONFIRM 'Everybody*accepts*score'   'COMMIT 0'
 GSCHANGE 'Yes, proceed' 'PROCEED 0'
 GSCHANGEWACTOR 'I don''t need*a scorer'   'ACTOR '';1;0'
 GSCHANGEWSCORER ''    ''
@@ -587,11 +589,11 @@ backcmd 'NEXTWORD 0 1'
 i. 0 0
 )
 formbon_fmsieze0_button =: 3 : 0
-if. #capt =. buttoncaptions0 {::~ 2 ; (0{::buttoncaptions0) i. Gstate do.
+if. 1 < #capt =. buttoncaptions0 {::~ 2 ; (0{::buttoncaptions0) i. Gstate do.
   NB. Replace ' with 'login'
   backcmd (({.~ , ('''' , Glogin) , }.~) i.&'''')^:(''''&e.) capt
-else.
-  if. Gstate=GSWORDS do. formbon_words'' end.   NB. empty string means words
+elseif. 1 = #capt do.
+  ('formbon_sieze0',capt)~''   NB. 1-character string is a local verb
 end.
 i. 0 0
 )
@@ -603,7 +605,7 @@ i. 0 0
 
 NB. Get words from clipboard
 DIRCHARS =: ''',-/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 '
-formbon_words =: 3 : 0
+formbon_sieze0W =: 3 : 0
 try.
   wds =. , wd'clippaste'
   wds =. <;._2 LF ,~ wds -. CR
@@ -620,6 +622,39 @@ if. 'ok' -: tmb   =: wd'mb query mb_ok "Is this word list OK?" *', ; ,&LF&.> wds
 end.
 )
 
+NB. The display for a single word
+FORM1wd =: 0 : 0
+cc fmwdrb?c0 radiobutton; cc fmwdrb?c1 radiobutton; cc fmwdrb?c2 radiobutton; cc fmwdrb?c3 radiobutton; cc fmwdrb?c4 radiobutton group; cc fmwdst? static;
+)
+NB. The display for the grid
+FORMSETTLE =: 0 : 0
+pc formsettle escclose closeok owner;
+grid shape %1 6;
+cc st0 static "Late";cc st1 static "Time";cc st2 static "???";cc st3 static "Pass";cc st4 static "Got";cc st5 static "word";
+%2
+cc ok button "OK"; 
+)
+
+NB. Display the scoring form at the end
+formbon_sieze0S =: 3 : 0
+NB. get the words of interest: turnwords and wordqueue, but only for the current round
+dispwds =. Gturnwordlist , Gwordqueue
+NB. Create the form
+buttons =. FORM1wd ;@:((rplc '?' ; ":)"_ 0) i. # dispwds
+wd FORMSETTLE rplc '%1',(":>:#dispwds);'%2';buttons
+NB. Based on the scoring (if any), create the form, for the scoring and the words
+wdbutt =. (0 1;0 0;0 2;_1 0;1 1) e. 2 {"1 dispwds
+if. #wdbutt =. (#~  5 ~: {."1) wdbutt ,. i. # dispwds do. wd ('set fmwdrb',":@[,'c',":@],'value 1')/"1 wdbutt end.
+NB. Display the form
+wd 'pshow'
+)
+formsettle_ok_button =: 3 : 0
+NB. Extract the data from the form
+NB. Send the new values to the background
+NB. Close the word form
+)
+formsettle_cancel =: 3 : 'wd pclose'
+formsettle_close_button =: formsettle_cancel
 
 cocurrent 'z'
 NB. language extensions

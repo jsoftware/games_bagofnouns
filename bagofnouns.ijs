@@ -221,7 +221,7 @@ i. 0 0
 sys_timer_z_ =: sys_timer_base_
 
 
-gblifnames =: ;:'Gstate Gscore Gdqlist Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin'
+gblifnames =: ;:'Gstate Gscore Gdqlist Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin Gturnwordlist'
 
 NB. Initial settings for globals shared with FE
 initstate =: 3 : 0
@@ -245,6 +245,7 @@ ourloginname =: ''
 rejcmd =: ''  NB. set to a LOGINREJ cmd if we need one
 Ggbls =: 0:"0 gblifnames  NB. Init old copy = something that never matches a boxed value
 Gdqlist =. 0 3$a:
+Gturnwordlist =: 0 3$a:
 NB.?lintsaveglobals
 )
 initstate''
@@ -457,10 +458,10 @@ if. Gstate e. GSWSTART,GSCHANGEWSTART do.
   NB. go ACTING state.  If we were in START, start the timer.  This starts the turn
   if. Gstate = GSWSTART do.
     Gtimedisp =: Groundno { Groundtimes
-    NB. turnwordlist is the list of round;word;score for words that have been moved off the wordqueue.  Taken together, turnwordhist and Gwordqueue
+    NB. Gturnwordlist is the list of round;word;score for words that have been moved off the wordqueue.  Taken together, turnwordhist and Gwordqueue
     NB. have all the words that were exposed this turn
-    turnwordlist =: 0 3$a:
-    NB.?lintonly turnwordlist =: ,: 1;'word';1 1
+    Gturnwordlist =: 0 3$a:
+    NB.?lintonly Gturnwordlist =: ,: 1;'word';1 1
     NB. We save a copy of the exposedwords before we start so that we can delete words dismissed twice in a row
     prevexposedwords =: exposedwords
     NB. Move the acting player to the bottom of the priority list
@@ -521,10 +522,10 @@ NB. Accept only if there is a word in the word queue, and if we are in a scorabl
 if. (*@# Gwordqueue) *. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
   NB. Adjust the score
   Gscore =: (score + Gteamup { Gscore) Gteamup} Gscore
-  NB. Move the word from the wordqueue to the turnwordlist
-  turnwordlist =: turnwordlist , (<score,retire) 2} {. Gwordqueue  NB. put rd/wd/score onto turnlist
+  NB. Move the word from the wordqueue to the Gturnwordlist
+  Gturnwordlist =: Gturnwordlist , (<score,retire) 2} {. Gwordqueue  NB. put rd/wd/score onto turnlist
   Gwordqueue =: }. Gwordqueue
-  Gwordundook =: *@# turnwordlist  NB. Allow undo if there's something to bring back
+  Gwordundook =: *@# Gturnwordlist  NB. Allow undo if there's something to bring back
   NB. If we are still acting or paused, top up the qword queue
   if. Gstate e. GSACTING,GSPAUSE do. getnextword'' end.
   NB. If the word queue is still empty, that's a change of state: go to CONFIRM to accept the score and move on.  Keep the time
@@ -538,10 +539,10 @@ postyhPREVWORD =: 3 : 0
 NB. If there is a word in the turnlist, and  we are acting or paused, or we are settling
 if. Gwordundook *. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) do.
   NB. Move tail of turnwords to head of Gwordqueue, adding in the dq info
-  tailwd =. {: turnwordlist
+  tailwd =. {: Gturnwordlist
   Gwordqueue =: Gwordqueue ,~ tailwd
-  turnwordlist =: }: turnwordlist
-  Gwordundook =: *@# turnwordlist  NB. Allow undo if there's something to bring back
+  Gturnwordlist =: }: Gturnwordlist
+  Gwordundook =: *@# Gturnwordlist  NB. Allow undo if there's something to bring back
   NB. Undo the score
   score =. (2;0) {:: tailwd  NB. score entered for the word
   Gscore =: (score -~ Gteamup { Gscore) Gteamup} Gscore
@@ -573,25 +574,25 @@ if. Gstate = GSCONFIRM do.
   if. exposedwords +:&(*@#) wordbag do. Gtimedisp =. 0 end.
     NB. Display & Discard words that have been passed twice in a row
     oldpass =. ((0;0 _1) -:"1 (0 2) {"1 prevexposedwords) # 1 {"1 prevexposedwords
-    newpass =. ((0;0 _1) -:"1 (0 2) {"1 turnwordlist) # 1 {"1 turnwordlist
+    newpass =. ((0;0 _1) -:"1 (0 2) {"1 Gturnwordlist) # 1 {"1 Gturnwordlist
     retired =. newpass (e. # [) oldpass  NB. words passed twice in a row in the first round
     Glogtext =: Glogtext , ;@:(('discarded: ' , '<br>' ,~ ])&.>) retired
-    turnwordlist =: (retired -.@e.~ 1 {"1 turnwordlist) # turnwordlist
+    Gturnwordlist =: (retired -.@e.~ 1 {"1 Gturnwordlist) # Gturnwordlist
     wordbag =: (retired -.@e.~ 1 {"1 wordbag) # wordbag
     Gdqlist =: (retired -.@e.~ 1 {"1 Gdqlist) # Gdqlist
 
     NB. Display & Discard words that have been marked as retired
-    handledmsk =. 1 = (2;1)&{::"1 turnwordlist  NB. words we finished
-    Gdqlist =: ((2 {."1 Gdqlist) -.@e. (handledmsk # 2 {."1 turnwordlist)) # Gdqlist  NB. Remove words we are showing now
-    htl =. handledmsk # turnwordlist  NB. the words we show everyone now
+    handledmsk =. 1 = (2;1)&{::"1 Gturnwordlist  NB. words we finished
+    Gdqlist =: ((2 {."1 Gdqlist) -.@e. (handledmsk # 2 {."1 Gturnwordlist)) # Gdqlist  NB. Remove words we are showing now
+    htl =. handledmsk # Gturnwordlist  NB. the words we show everyone now
     Glogtext =: Glogtext , ((2;0)&{::"1 htl) ;@:(({::&('guessed late: ';'guessed: ')@[ , '<br>' ,~ ])&.>) 1 {"1 htl
-    turnwordlist =: (-. handledmsk) # turnwordlist  NB. The  words have now passed on
+    Gturnwordlist =: (-. handledmsk) # Gturnwordlist  NB. The  words have now passed on
   if. Gtimedisp=0 do.
     NB. if no time left, handle end-of-turn
     NB. Put the remaining turn words into the exposed list
-    exposedwords =: turnwordlist
+    exposedwords =: Gturnwordlist
     NB. Also into the dqlist for the player who saw them
-    Gdqlist =: Gdqlist , (<Gactor) (<a:;2)} turnwordlist
+    Gdqlist =: Gdqlist , (<Gactor) (<a:;2)} Gturnwordlist
   end.
   NB. Figure next state:
   NB. GAMEOVER if the exposed and bag are still empty
@@ -655,7 +656,7 @@ else.
         end.
       else.
         NB. Transitioning from some time to no time, i. e. the buzzer sounds.  If bothing to be scored, CONFIRM, otherwise SETTLE
-        Gstate =: (turnwordlist +.&(*@#) Gwordqueue) { GSCONFIRM,GSSETTLE
+        Gstate =: (Gturnwordlist +.&(*@#) Gwordqueue) { GSCONFIRM,GSSETTLE
       end.
     end.
   end.
