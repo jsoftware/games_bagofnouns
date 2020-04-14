@@ -330,9 +330,9 @@ case. GSPAUSE do. text =. 'Clock is stopped while ' , Gactor , ' is playing ' , 
 case. GSSETTLE do. text =. Gactor , ' is entering scores for the last words'
 case. GSCONFIRM do.
   NB. Extract the words that have been retired
-  rwords =. 2 {"1 (#~ 1 = (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words
-  wd 'set fmgeneral text *words: ', _2 }. ,&', '&.> rwords
-  text =. 'Check the score and see the words'
+  rwords =. 1 {"1 (#~ 1 = (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words
+  wd 'set fmgeneral text *' , ((Glogin-:Gactor) # 'Click when the score is agreed.  ') , 'Words: ', _2 }. ; ,&', '&.> rwords
+  text =. 'Note the words, check the score'
 case. GSCHANGE do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Round change!  You will be playing ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
   text =. 'Changing to ' , Groundno {:: 'Taboo';'Charades';'Password';'Scotch'
@@ -368,10 +368,10 @@ buttoncaptions1 =: (<@;)`(<@(,&a:))`(<@(,&a:))"1 ".&.> |: ;:@(LF&(('*'&(I.@:=)@]
 GSWACTOR 'I will play*but I need*a scorer' 'ACTOR '';1;1'
 GSWSCORER 'I will score'  'SCORER '';1'
 GSWSTART 'Undo'  'SCORER '';0'
-GSACTING 'Undo last word' 'PREVWORD 0'
-GSPAUSE 'Undo last word'  'PREVWORD 0'
-GSSETTLE 'Undo last word'  'PREVWORD 0'
-GSCONFIRM 'Undo last word'  'PREVWORD 0'
+GSACTING 'Undo last score' 'PREVWORD 0'
+GSPAUSE 'Undo last score'  'PREVWORD 0'
+GSSETTLE 'Undo last score'  'PREVWORD 0'
+GSCONFIRM 'Undo last score'  'PREVWORD 0'
 GSCHANGE '' ''
 GSCHANGEWACTOR 'I need*a scorer'   'ACTOR '';1;1'
 GSCHANGEWSCORER 'I will score'  'SCORER '';1'
@@ -447,10 +447,10 @@ i. 0 0
 )
 
 handGwordqueue =: 3 : 0
-if. Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM do.
+if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
   if. Glogin -: Gactor do.
     NB. Special display for the actor.  Prefix it with instructions
-    text =. ((GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) i. Gstate){'Play these words in order:';'Clock is stopped - wait';'Score the word in red, or undo to change an earlier word:';'Enter when you are sure the score is right.'
+    text =. ((GSACTING,GSPAUSE,GSSETTLE) i. Gstate){'Play these words in order:';'Clock is stopped - wait';'Score the word in red, or undo to change an earlier word:'
     if. #Gwordqueue do.
       NB. Show the queue, with an indication of how the words were scored, if they were
       words =. 1 {"1 Gwordqueue
@@ -493,7 +493,7 @@ wd 'set fmscore0 text ',(":0 { Gscore),';set fmscore1 text ',":1 { Gscore
 )
 
 handGtimedisp =: 3 : 0
-if. Gstate e. GSWSTART,GSACTING,GSPAUSE,GSSETTLE,GSCHANGE do. wd 'set fmprogress value *',": Gtimedisp end.
+if. Gstate e. GSWACTOR,GSWSTART,GSACTING,GSPAUSE,GSSETTLE,GSCHANGE do. wd 'set fmprogress value *',": Gtimedisp end.
 wd 'set fmretire3 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gscorer)
 wd 'set fmretire4 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gscorer)
 ''
