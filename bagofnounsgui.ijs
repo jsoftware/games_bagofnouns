@@ -68,7 +68,7 @@ login
 
 
 FORMBON =: 0 : 0
-pc formbon escclose closeok;
+pc formbon escclose closeok;pn "Bag Of Nouns";
 menupop Teams;
 menu fmteamshow "Show teams";
 menupopz;
@@ -358,7 +358,7 @@ GSWSTART 'Start the clock'  'ACT 0'
 GSACTING 'Stop the clock'  'TIMERADJ 0;0;'''
 GSPAUSE 'Start the clock'  'TIMERADJ 1;0;'''
 GSSETTLE 'See all*the words'   'S'
-GSCONFIRM 'Everybody*accepts*score'   'COMMIT 0'
+GSCONFIRM 'Everybody*agrees*score'   'COMMIT 0'
 GSCHANGE 'Yes, proceed' 'PROCEED 0'
 GSCHANGEWACTOR 'I don''t need*a scorer'   'ACTOR '';1;0'
 GSCHANGEWSCORER ''    ''
@@ -371,7 +371,7 @@ GSWSTART 'Undo'  'SCORER '';0'
 GSACTING 'Undo last score' 'PREVWORD 0'
 GSPAUSE 'Undo last score'  'PREVWORD 0'
 GSSETTLE 'Undo last score'  'PREVWORD 0'
-GSCONFIRM 'Undo last score'  'PREVWORD 0'
+GSCONFIRM 'See all*the words'   'S'
 GSCHANGE '' ''
 GSCHANGEWACTOR 'I need*a scorer'   'ACTOR '';1;1'
 GSCHANGEWSCORER 'I will score'  'SCORER '';1'
@@ -594,19 +594,23 @@ if. 1 < #capt =. buttoncaptions0 {::~ 2 ; (0{::buttoncaptions0) i. Gstate do.
   NB. Replace ' with 'login'
   backcmd (({.~ , ('''' , Glogin) , }.~) i.&'''')^:(''''&e.) capt
 elseif. 1 = #capt do.
-  ('formbon_sieze0',capt)~''   NB. 1-character string is a local verb
+  ('formbon_sieze',capt)~''   NB. 1-character string is a local verb
 end.
 i. 0 0
 )
 formbon_fmsieze1_button =: 3 : 0
-NB. Replace ' with 'login'
-backcmd (({.~ , ('''' , Glogin) , }.~) i.&'''')^:(''''&e.) buttoncaptions1 {::~ 2 ; (0{::buttoncaptions1) i. Gstate
+if. 1 < #capt =. buttoncaptions1 {::~ 2 ; (0{::buttoncaptions1) i. Gstate do.
+  NB. Replace ' with 'login'
+  backcmd (({.~ , ('''' , Glogin) , }.~) i.&'''')^:(''''&e.) capt
+elseif. 1 = #capt do.
+  ('formbon_sieze',capt)~''   NB. 1-character string is a local verb
+end.
 i. 0 0
 )
 
 NB. Get words from clipboard
 DIRCHARS =: ''',-/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 '
-formbon_sieze0W =: 3 : 0
+formbon_siezeW =: 3 : 0
 try.
   wds =. , wd'clippaste'
   wds =. <;._2 LF ,~ wds -. CR
@@ -630,7 +634,7 @@ cc fmwdrb?c3 radiobutton group; set fmwdrb?c3 caption ""; cc fmwdrb?c4 radiobutt
 )
 NB. The display for the grid
 FORMSETTLE =: 0 : 0
-pc formsettle escclose closeok owner;
+pc formsettle escclose closeok owner;pn "Your words for this round";
 bin vg;
 grid shape 6;
 cc st0 static; set st0 text "Late";cc st1 static; set st1 text "Time";cc st2 static; set st2 text "???";cc st3 static; set st3 text "Pass";cc st4 static; set st4 text "Got";cc wd static; set wd text "";
@@ -642,7 +646,7 @@ bin z;
 
 NB. Display the scoring form at the end
 BUTTdisps =: 0 1;0 0;0 _1;_1 0;1 1  NB. disp for Late Time ??? Pass Got
-formbon_sieze0S =: 3 : 0
+formbon_siezeS =: 3 : 0
 NB. get the words of interest: turnwords and wordqueue, but only for the current round
 if. #dispwds =. Gturnwordlist , Gwordqueue do.
   rdx =. I. (<Groundno) = 0 {"1 dispwds   NB. Indexes of modifiable words

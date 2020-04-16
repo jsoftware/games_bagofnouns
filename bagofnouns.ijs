@@ -621,7 +621,7 @@ postyhCOMMIT =: 3 : 0
 NB. Accept if in CONFIRM state
 if. Gstate = GSCONFIRM do.
   NB. If exposed and bag are empty, this actor gets no more words, so take the time away
-  if. exposedwords +:&(*@#) wordbag do. Gtimedisp =. 0 end.
+  if. exposedwords +:&(*@#) wordbag do. Gtimedisp =: 0 end.
     NB. Display & Discard words that have been passed twice in a row
     oldpass =. ((0;0 _1) -:"1 (0 2) {"1 prevexposedwords) # 1 {"1 prevexposedwords
     newpass =. ((0;0 _1) -:"1 (0 2) {"1 Gturnwordlist) # 1 {"1 Gturnwordlist
