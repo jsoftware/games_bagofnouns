@@ -588,14 +588,14 @@ end.
 NB. table of row;new score
 postyhSCOREMOD =: 3 : 0
 NB. Accept only if SETTLE
-if. Gstate = GWSETTLE do.
+if. Gstate = GSSETTLE do.
   edits =. y
   NB. This operates on the combined wordlist/queue.  Create that here and split again at the end
   wl =. Gturnwordlist , Gwordqueue
   NB. Save total score before change
   sc0 =. +/ {.@(2&{::)"1 wl
   NB. apply the edits
-  wl =. ({:"1 edits) (<2; ; {."1 edits)} wl
+  wl =. ({:"1 edits) (<2 ;~ ; {."1 edits)} wl
   NB. Get total score after change
   sc1 =. +/ {.@(2&{::)"1 wl
   NB. Adjust the score

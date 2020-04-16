@@ -631,7 +631,7 @@ NB. The display for the grid
 FORMSETTLE =: 0 : 0
 pc formsettle escclose closeok owner;
 bin vg;
-grid shape 4 6;
+grid shape 6;
 cc st0 static; set st0 text "Late";cc st1 static; set st1 text "Time";cc st2 static; set st2 text "???";cc st3 static; set st3 text "Pass";cc st4 static; set st4 text "Got";cc wd static; set wd text "";
 %2
 bin z;
