@@ -430,12 +430,6 @@ end.
 ''
 )
 
-NB. name do/undo
-postyhSCORER =: 3 : 0
-NB. Accept if:
-NB.  do in WSCORER or CHANGEWSCORER
-NB.  undo in WSTART if actor or scorer
-NB.  undo in CHANGEWSTART if scorer
 SCORERstates =: ".;._2 (0 : 0)
 GSWSCORER , 1 0 0
 GSWSCORER , 1 0 1
@@ -449,8 +443,14 @@ GSWSTART , 0 0 1
 GSWSTART , 0 1 0
 GSWSTART , 0 1 1
 GSCHANGEWSTART , 0 0 1
-GSWCHANGESTART , 0 1 1
+GSCHANGEWSTART , 0 1 1
 )
+NB. name do/undo
+postyhSCORER =: 3 : 0
+NB. Accept if:
+NB.  do in WSCORER or CHANGEWSCORER
+NB.  undo in WSTART if actor or scorer
+NB.  undo in CHANGEWSTART if scorer
 'name do' =. y
 if. Gstate , do , (name-:Gactor) , (name-:Gscorer) e, SCORERstates do.
   if. do do.
@@ -607,7 +607,6 @@ if. Gstate = GWSETTLE do.
   NB. If the wordqueue is not empty, go to CONFIRM
   Gstate =: (*@# Gwordqueue) { GSCONFIRM,GSSETTLE
 end.
-
 ''
 )
 
