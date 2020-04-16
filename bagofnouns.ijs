@@ -422,8 +422,8 @@ if. do = (1 ,((name-:Gactor) { 2 2,:0 1),2) {~ (GSWACTOR,GSWSCORER,GSCHANGEWACTO
     end.
     Gscorer =: needscorer {:: name;''
   elseif. Gstate e. GSWSTART,GSWSCORER do.
-    NB. We are taking an undo, necessarily from START/SCORER to ACTOR.  Forget the actor's name
-    Gactor =: ''
+    NB. We are taking an undo, necessarily from START/SCORER to ACTOR.  Forget the actor's name, and the scorer's
+    Gactor =: Gscorer =: ''
     Gstate =: GSWACTOR
   end.
 end.
@@ -432,9 +432,27 @@ end.
 
 NB. name do/undo
 postyhSCORER =: 3 : 0
-NB. Accept if in WSCORER or CHANGEWSCORER (type=1) or WSTART or CHANGEWSTART (type=0 & actor or scorer)
+NB. Accept if:
+NB.  do in WSCORER or CHANGEWSCORER
+NB.  undo in WSTART if actor or scorer
+NB.  undo in CHANGEWSTART if scorer
+SCORERstates =: ".;._2 (0 : 0)
+GSWSCORER , 1 0 0
+GSWSCORER , 1 0 1
+GSWSCORER , 1 1 0
+GSWSCORER , 1 1 1
+GSCHANGEWSCORER , 1 0 0
+GSCHANGEWSCORER , 1 0 1
+GSCHANGEWSCORER , 1 1 0
+GSCHANGEWSCORER , 1 1 1
+GSWSTART , 0 0 1
+GSWSTART , 0 1 0
+GSWSTART , 0 1 1
+GSCHANGEWSTART , 0 0 1
+GSWCHANGESTART , 0 1 1
+)
 'name do' =. y
-if. do = (1 0 ,(((<name) e. Gscorer;Gactor) { 2 2,:0 0),2) {~ (GSWSCORER,GSCHANGEWSCORER,GSWSTART,GSCHANGEWSTART) i. Gstate do.
+if. Gstate , do , (name-:Gactor) , (name-:Gscorer) e, SCORERstates do.
   if. do do.
     Gscorer =: name
     Gstate =: (Gstate=GSWSCORER) { GSCHANGEWSTART,GSWSTART
@@ -442,9 +460,9 @@ if. do = (1 0 ,(((<name) e. Gscorer;Gactor) { 2 2,:0 0),2) {~ (GSWSCORER,GSCHANG
     NB. It's an undo
     Gscorer =: ''
     Gstate =: (Gstate=GSWSTART) { GSCHANGEWSCORER,GSWSCORER
-    if. name-:Gactor do.   NB. If actor quails, go back to WACTOR
+    if. (name-:Gactor) *. (Gstate=GSWSCORER) do.   NB. If actor quails, go back to WACTOR - not if CHANGE
       Gactor =: ''
-      Gstate =: (Gstate=GSWSCORER) { GSCHANGEWACTOR,GSWACTOR
+      Gstate =: GSWACTOR
     end.
   end.
 end.
@@ -525,7 +543,7 @@ if. (*@# Gwordqueue) *. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
   NB. Move the word from the wordqueue to the Gturnwordlist
   Gturnwordlist =: Gturnwordlist , (<score,retire) 2} {. Gwordqueue  NB. put rd/wd/score onto turnlist
   Gwordqueue =: }. Gwordqueue
-  Gwordundook =: *@# Gturnwordlist  NB. Allow undo if there's something to bring back
+  Gwordundook =: (<Groundno) e. 0 {"1 Gturnwordlist  NB. Allow undo if there's something to bring back
   NB. If we are still acting or paused, top up the qword queue
   if. Gstate e. GSACTING,GSPAUSE do. getnextword'' end.
   NB. If the word queue is still empty, that's a change of state: go to CONFIRM to accept the score and move on.  Keep the time
@@ -542,7 +560,7 @@ if. Gwordundook *. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) do.
   tailwd =. {: Gturnwordlist
   Gwordqueue =: Gwordqueue ,~ tailwd
   Gturnwordlist =: }: Gturnwordlist
-  Gwordundook =: *@# Gturnwordlist  NB. Allow undo if there's something to bring back
+  Gwordundook =:  (<Groundno) e. 0 {"1 Gturnwordlist  NB. Allow undo if there's something to bring back
   NB. Undo the score
   score =. (2;0) {:: tailwd  NB. score entered for the word
   Gscore =: (score -~ Gteamup { Gscore) Gteamup} Gscore
@@ -566,6 +584,33 @@ if. Gstate=GSCHANGE do.
 end.
 ''
 )
+
+NB. table of row;new score
+postyhSCOREMOD =: 3 : 0
+NB. Accept only if SETTLE
+if. Gstate = GWSETTLE do.
+  edits =. y
+  NB. This operates on the combined wordlist/queue.  Create that here and split again at the end
+  wl =. Gturnwordlist , Gwordqueue
+  NB. Save total score before change
+  sc0 =. +/ {.@(2&{::)"1 wl
+  NB. apply the edits
+  wl =. ({:"1 edits) (<2; ; {."1 edits)} wl
+  NB. Get total score after change
+  sc1 =. +/ {.@(2&{::)"1 wl
+  NB. Adjust the score
+  Gscore =: ((sc1-sc0) + Gteamup { Gscore) Gteamup} Gscore
+  NB. Split back into two lists, with wordqueue holding unscored words
+  unscored =. a: = 2 {"1 wl
+  Gturnwordlist =: (-. unscored) # wl
+  Gwordqueue =: unscored # wl
+  NB. If the wordqueue is not empty, go to CONFIRM
+  Gstate =: (*@# Gwordqueue) { GSCONFIRM,GSSETTLE
+end.
+
+''
+)
+
 NB. nilad
 postyhCOMMIT =: 3 : 0
 NB. Accept if in CONFIRM state

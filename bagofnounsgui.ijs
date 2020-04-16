@@ -252,7 +252,7 @@ NB. Run the tables together, keep the latest of each
 cmds =. ((~.@[ ,. ({:/. {:"1))~ {."1) ; ".&.> y
 NB. Assign values to names
 ({."1 cmds) =: {:"1 cmds
-NB. Start with the lowest modified state, and then all handlers till the end
+NB. Start with the lowest modified state, and then all handlers till the end.  May be none
 wd 'psel formbon'
 for_h. statepri (<./@:i. }. [) {."1 cmds do. ('hand',>h)~ '' end.
 ''
@@ -292,9 +292,9 @@ fmcharades90     l0     l0     l0   l1     l0     l0      l0     l0    l0     l0
 fmscoreadj0      l0     l0     l0   l0     l0     l0      l0     l0    l0     l1     l1     l0      l0             l0             l0         c0
 fmlogin          c0     l1     l1   c1     c1      a       as     as    as     as    as     as      as              a              a         c0
 fmscoreadj1      l0     l0     l0   l0     l0     l0      l0     l0    l0     l1     l1     l0      l0             l0             l0         c0
-fmretire0        l0     l0     l0   l0     l0     l0      l0      S     S      S     l0     l0      l0             l0             l0         c0
-fmretire1        l0     l0     l0   l0     l0     l0      l0      S     S      S     l0     l0      l0             l0             l0         c0
-fmretire2        l0     l0     l0   l0     l0     l0      l0      S     S      S     l0     l0      l0             l0             l0         c0
+fmretire0        l0     l0     l0   l0     l0     l0      l0      S     S      A     l0     l0      l0             l0             l0         c0
+fmretire1        l0     l0     l0   l0     l0     l0      l0      S     S      A     l0     l0      l0             l0             l0         c0
+fmretire2        l0     l0     l0   l0     l0     l0      l0      S     S      A     l0     l0      l0             l0             l0         c0
 fmsieze0         l0     l0     l0   l1      T     A       S     l1     S      A      A      A       A              A               S         c0
 fmsieze1         l0     l0     l0   l0      T     l1      AS     Sw    Sw     Aw     Aw     l0      A              l1             AS         c0
 )
@@ -324,7 +324,7 @@ case. GSWACTOR do.
 case. GSWSCORER do. text =. 'Need someone to score for ' , Gactor
 case. GSWSTART do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'You may fire when you are ready, Gridley.'
-  text =. 'Waiting for ' , Gscorer , ' to start the clock'
+  text =. 'Waiting for ' , Gscorer , ' to start the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
 case. GSACTING do. text =. Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password') , ' and ' , ((Gactor -.@-: Gscorer) # Gscorer , ' is ') , 'scoring'
 case. GSPAUSE do. text =. 'Clock is stopped while ' , Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password')
 case. GSSETTLE do. text =. Gactor , ' is entering scores for the last words'
@@ -342,7 +342,7 @@ case. GSCHANGEWACTOR do.
 case. GSCHANGEWSCORER do. text =. 'Need someone to score for ' , Gactor
 case. GSCHANGEWSTART do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'You may fire when you are ready, Gridley.'
-  text =. 'Waiting for ' , Gscorer , ' to start the clock'
+  text =. 'Waiting for ' , Gscorer , ' to start the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
 case. GSGAMEOVER do. text =. 'Game Over'
 case. do. text =. ''
 end.
@@ -624,34 +624,52 @@ end.
 
 NB. The display for a single word
 FORM1wd =: 0 : 0
-cc fmwdrb?c0 radiobutton; cc fmwdrb?c1 radiobutton; cc fmwdrb?c2 radiobutton; cc fmwdrb?c3 radiobutton; cc fmwdrb?c4 radiobutton group; cc fmwdst? static;
+cc fmwdrb?c0 radiobutton; set fmwdrb?c0 caption ""; cc fmwdrb?c1 radiobutton group; set fmwdrb?c1 caption ""; cc fmwdrb?c2 radiobutton group; set fmwdrb?c2 caption "";
+cc fmwdrb?c3 radiobutton group; set fmwdrb?c3 caption ""; cc fmwdrb?c4 radiobutton group; set fmwdrb?c4 caption ""; cc fmwdst? static; set fmwdst? font "Courier New" 16;
 )
 NB. The display for the grid
 FORMSETTLE =: 0 : 0
 pc formsettle escclose closeok owner;
-grid shape %1 6;
-cc st0 static "Late";cc st1 static "Time";cc st2 static "???";cc st3 static "Pass";cc st4 static "Got";cc st5 static "word";
+bin vg;
+grid shape 4 6;
+cc st0 static; set st0 text "Late";cc st1 static; set st1 text "Time";cc st2 static; set st2 text "???";cc st3 static; set st3 text "Pass";cc st4 static; set st4 text "Got";cc wd static; set wd text "";
 %2
-cc ok button "OK"; 
+bin z;
+cc ok button; set ok caption "OK";
+bin z;
 )
 
 NB. Display the scoring form at the end
+BUTTdisps =: 0 1;0 0;0 2;_1 0;1 1  NB. disp for Late Time ??? Pass Got
 formbon_sieze0S =: 3 : 0
 NB. get the words of interest: turnwords and wordqueue, but only for the current round
-dispwds =. Gturnwordlist , Gwordqueue
-NB. Create the form
-buttons =. FORM1wd ;@:((rplc '?' ; ":)"_ 0) i. # dispwds
-wd FORMSETTLE rplc '%1',(":>:#dispwds);'%2';buttons
-NB. Based on the scoring (if any), create the form, for the scoring and the words
-wdbutt =. (0 1;0 0;0 2;_1 0;1 1) e. 2 {"1 dispwds
-if. #wdbutt =. (#~  5 ~: {."1) wdbutt ,. i. # dispwds do. wd ('set fmwdrb',":@[,'c',":@],'value 1')/"1 wdbutt end.
-NB. Display the form
-wd 'pshow'
+if. #dispwds =. Gturnwordlist , Gwordqueue do.
+  rdx =. I. (<Groundno) = 0 {"1 dispwds   NB. Indexes of modifiable words
+  NB. Create the form
+  buttons =. FORM1wd ;@:((rplc '?' ; ":)"_ 0) rdx
+  wd FORMSETTLE rplc '%2';buttons
+  NB. Based on the scoring (if any), create the form, for the scoring and the words
+  wdbutt =. BUTTdisps i. (<rdx;2) { dispwds
+  if. #wdbutt =. (#~  5 ~: {."1) wdbutt ,. rdx do. wd ('set fmwdrb',":@],'c',' value 1' ,~ ":@[)/"1 wdbutt end.
+  rdx ([: wd 'set fmwdst' , ":@[ , ' text *' , ])&>  (<rdx;1) { dispwds
+  NB. Display the form
+  wd 'pshow'
+end.
 )
 formsettle_ok_button =: 3 : 0
+wdq  =: wd 'q'
 NB. Extract the data from the form
-NB. Send the new values to the background
+if. #checks =. (#~ (<,'1') = {:"1) wdq do.
+  buttsels =. (([: _9&". 6 }. _2 }. ]) , _9&".@{:)@> (#~  ('fmwdrb' -: 6&{.)@>) {."1 checks
+  buttsels =. ({. ; BUTTdisps {~ {:)"1 buttsels  NB. convert to index ; disposition
+  NB. Remove the values that have not changed
+  if. #buttsels =. (2 {"1 Gturnwordlist , Gwordqueue) (] #~ ({:@] -.@-: ({~ {.))"_ 1) buttsels do.
+    NB. Send the new values to the background
+    backcmd 'SCOREMOD ' , 5!:5 <'buttsels'
+  end.
+end.
 NB. Close the word form
+wd 'pclose'
 )
 formsettle_cancel =: 3 : 'wd pclose'
 formsettle_close_button =: formsettle_cancel
