@@ -495,8 +495,8 @@ wd 'set fmscore0 text ',(":0 { Gscore),';set fmscore1 text ',":1 { Gscore
 
 handGtimedisp =: 3 : 0
 if. Gstate e. GSWACTOR,GSWSTART,GSACTING,GSPAUSE,GSSETTLE,GSCHANGE do. wd 'set fmprogress value *',": Gtimedisp end.
-wd 'set fmretire3 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gscorer)
-wd 'set fmretire4 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gscorer)
+wd 'set fmretire3 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gactor)
+wd 'set fmretire4 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gactor)
 ''
 )
 
@@ -641,7 +641,7 @@ bin z;
 )
 
 NB. Display the scoring form at the end
-BUTTdisps =: 0 1;0 0;0 2;_1 0;1 1  NB. disp for Late Time ??? Pass Got
+BUTTdisps =: 0 1;0 0;0 _1;_1 0;1 1  NB. disp for Late Time ??? Pass Got
 formbon_sieze0S =: 3 : 0
 NB. get the words of interest: turnwords and wordqueue, but only for the current round
 if. #dispwds =. Gturnwordlist , Gwordqueue do.
