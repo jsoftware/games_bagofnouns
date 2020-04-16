@@ -458,7 +458,7 @@ NB.  do in WSCORER or CHANGEWSCORER
 NB.  undo in WSTART if actor or scorer
 NB.  undo in CHANGEWSTART if scorer
 'name do' =. y
-if. Gstate , do , (name-:Gactor) , (name-:Gscorer) e, SCORERstates do.
+if. (Gstate , do , (name-:Gactor) , (name-:Gscorer)) e. SCORERstates do.
   if. do do.
     Gscorer =: name
     Gstate =: (Gstate=GSWSCORER) { GSCHANGEWSTART,GSWSTART
