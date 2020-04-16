@@ -100,7 +100,7 @@ grid colstretch 0 5; grid colstretch 1 1;
  rem left side: the display;
  bin g;
  grid shape 6 1;
- grid rowheight 0 100; grid rowheight 1 50; grid rowheight 2 200; grid rowheight 3 200; grid rowheight 4 200; grid rowheight 5 50;
+ grid rowheight 0 50; grid rowheight 1 25; grid rowheight 2 100; grid rowheight 3 100; grid rowheight 4 100; grid rowheight 5 25;
  grid rowstretch 0 1; grid rowstretch 1 1; grid rowstretch 2 2; grid rowstretch 3 2; grid rowstretch 3 2; grid rowstretch 5 1;
   rem top row: scores & login;
   bin h;
@@ -380,6 +380,7 @@ GSCHANGEWSTART 'Undo!  I don''t*want to score'  'SCORER '';0'
 
 handGteams =: 3 : 0
 wd 'set fmlogin items' , ;@:((' "' , ,&'"')&.>) (/: tolower&.>) ; Gteams
+wd 'set fmlogin select ' , ": # ; Gteams  NB. Make selection blank
 wd 'set fmstart enable ' , ": loggedin *. (Gstate=GSWORDS) *. (2=#Gteams)
 ''
 )

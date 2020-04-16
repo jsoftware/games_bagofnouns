@@ -63,13 +63,13 @@ NB. Wait for hello
 sockloop lsk;tourn;password
 )
 
+NB. Return 1 if error
 sockpoll =: 3 : 0
 'qbm sk tourn password' =. y
 feconnlost=.0
 NB. Wait for a pulse from the front end
 if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.  NB. allow long time for dialog box
-  return.  NB. scaf
-  smoutput 'heartbeat lost' return. 
+  0 return.  NB. scaf poll again - in real system use a long timeout and fail here
 end.
 NB. There is data to read.  Read it all, until we have the complete message(s).  First 4 bytes are the length
 hdr =. ''   NB. No data, no bytes of header
@@ -89,7 +89,7 @@ while. do.
   while. hlen > 0 do.
     if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.2 break. end.
     'rc data' =. sdrecv_jsocket_ sk,(4+hlen),00   NB. Read the data, plus the next length
-    if. rc~:0 do. 'Error ',(":0{::rc),' reading from frontend' 13!:8 (4) end.
+    if. rc~:0 do. rc return. end.
     if. 0=#data do. feconnlost=.3 break. end.
     readdata =. readdata , data
     hlen=.hlen-#data  NB. when we have all the data, plus possibly the next length
@@ -101,13 +101,13 @@ while. do.
   hdr =. hlen {. readdata  NB. transfer the length
   if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.5 break. end.
 end.
-if. feconnlost do. wd 'timer 0' [ smoutput 'fe connection lost'  return. end.
+if. feconnlost do. feconnlost [ wd 'timer 0' [ smoutput 'fe connection lost'  return. end.
 NB. perform pre-sync command processing
 if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
 senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('INCR "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
 NB. Create a connection to the server and send all the data in an INCR command
 sendstarttime =. 6!:1''  NB. scaf
-for_dly. 1000 1000 1000 do.
+for_dly. 1000 2000 3000 3000 3000 do.
   NB.?lintloopbodyalways
   ssk =. 1 {:: sdsocket_jsocket_ ''  NB. listening socket
   sdioctl_jsocket_ ssk , FIONBIO_jsocket_ , 1  NB. Make socket non-blocking
@@ -119,17 +119,17 @@ for_dly. 1000 1000 1000 do.
   ssk =. 0
 end.
 if. ssk=0 do.  NB. uncorrectable server error
-  'Unable to reach game server.  Check your Internet.' 13!:8 (4)
+  7 return.
 end.
 NB. Send the data.  Should always go in one go
 while. #senddata do.
   rc =. senddata sdsend_jsocket_ ssk,0
-  if. 0{::rc do. 'Error ',(":0{::rc),' in sdsend to server' 13!:8 (4) end.
+  if. 0{::rc do. 0{::rc return. end.
   if. (#senddata) = 1{::rc do. break. end.
   senddata =. (1{::rc) }. senddata
   if. -. ssk e. 2 {:: sdselect_jsocket_ '';ssk;'';5000 do. rc =. 1;'' break. end.
 end.
-if. 0{::rc do. sdclose_jsocket_ ssk return. end.  NB. error sending - what's that about?  Abort
+if. 0{::rc do. 8 [ sdclose_jsocket_ ssk return. end.  NB. error sending - what's that about?  Abort
 NB. Read the response, until the server closes
 readdata =. ''
 while. do.
@@ -141,7 +141,7 @@ while. do.
   end.
   if. -. ssk e. rsockl do. readdata =. '' break. end.  NB. Exit with empty data as error flag
   'rc data' =. sdrecv_jsocket_ ssk,10000,0
-  if. rc do. 'Error ',(":rc),' in sdrecv from server' 13!:8 (4) end.
+  if. rc do. rc return. end.
   if. 0=#data do. break. end.  NB. Normal exit: host closes connection
   readdata =. readdata , data  NB. Accumulate reply
 end.
@@ -167,9 +167,9 @@ qprintf'diffs '
       chg =. 5!:5 <'diffs'  NB. Get data to send
       senddata =. (2 (3!:4) #chg) , chg   NB. prepend length
       while. #senddata do.
-        if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';5000 do. 'Timeout sending to frontend' 13!:8 (4) end.
+        if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';5000 do. 9 return.  end.
         rc =. senddata sdsend_jsocket_ sk,0
-        if. 0{::rc do. 'Error ',(":0{::rc),' in sdsend to frontend' 13!:8 (4) end.
+        if. 0{::rc do. 0{::rc return. end.
         if. (#senddata) = 1{::rc do. break. end.
         senddata =. (1{::rc) }. senddata
       end.
@@ -177,6 +177,7 @@ qprintf'diffs '
   end.
 end.
 NB. If we did not read a response, quietly discard it
+0
 )
 
 NB. Loop forever reading/writing sockets. y is the socket we are listening on.
@@ -209,7 +210,12 @@ end.
 )
 
 sys_timer  =: 3 : 0
-try. sockpoll timerpms
+try. rc =. sockpoll timerpms
+if. rc do.  NB. scaf
+  smoutput 'Error ' , (":rc) , ' on sockets'
+  wd 'timer 0'
+  sockloop lsk;2 3 { timerpms  NB. retry
+end.
 catch.
 wd 'timer 0'
 smoutput 'error in timer'
