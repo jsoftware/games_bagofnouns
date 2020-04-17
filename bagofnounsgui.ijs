@@ -161,6 +161,8 @@ qprintf'sk '
 if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';4000 do. 'Error connecting to background' 13!:8 (4) end.
 NB. Start with a message to say we arrived.  The response must set all our globals
 backcmd 'HELLO ',":cleargame
+Gbuttonblink =: ''  NB. Avoid one-shots on first login, since there was nothing to reset them
+Gturnblink =: 0
 cleargame=:0  NB. Don't do it again accidentally
 wd :: 0: 'psel formbon;pclose'
 wd FORMBON
@@ -277,22 +279,14 @@ wd 'set fmcharades90 checked ' , ": 90 = 1 { Groundtimes
 handGturnblink =: 3 : 0
 if. Gturnblink do.
   NB. Play an attention-getting animation
-  wd 'set fmgeneral font "Courier New" 256 bold;set fmgeneral text *<font color=#FF0000>RING</font>'
-  wd 'msgs'
-  6!:3 (0.1)
-  wd 'set fmgeneral font "Courier New" 192 bold;set fmgeneral text *<font color=#00FF00>RINGGG</font>'
-  wd 'msgs'
-  6!:3 (0.1)
-  wd 'set fmgeneral font "Courier New" 128 bold;set fmgeneral text *<font color=#0000FF>RINGGGGG</font>'
-  wd 'msgs'
-  6!:3 (0.1)
-  wd 'set fmgeneral font "Courier New" 96 bold;set fmgeneral text *<font color=#FFFF00>RINGGGGGGG</font>'
-  wd 'msgs'
-  6!:3 (0.1)
-  wd 'set fmgeneral font "Courier New" 64 bold;set fmgeneral text *<font color=#00FFFF>RINGGGGGGGG</font>'
-  wd 'msgs'
-  6!:3 (0.3)
-  wd 'set fmgeneral font "Courier New" 32 bold'
+  for_color. '0123456789ABCDEF' {~ 20 6 ?@$ 16 do.
+    fsize =. 128 + ? 128
+    wlen =. 4 + ?5
+    wchars =. 'RING' [^:(?2) wlen ((?@$ #) { ]) '!@#$%^&*()AgdrwTGdfsvDFHJYTSIGFTBSDL'
+    wd 'set fmgeneral font "Courier New" ' , (":fsize) , ' bold;set fmgeneral text *<font color=#' , color , '>',wchars,'</font>'
+    wd 'msgs'
+    6!:3 (0.05)
+  end.
   Gturnblink =: 0  NB. It shouldn't come twice, but take no chances
 end.
 ''
