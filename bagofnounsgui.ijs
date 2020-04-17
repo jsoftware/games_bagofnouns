@@ -95,49 +95,54 @@ menupopz;
 menupopz;
 bin g;
 grid shape 1 2;
-grid colwidth 0 500; grid colwidth 1 100;
+grid colwidth 0 50; grid colwidth 1 20;
 grid colstretch 0 5; grid colstretch 1 1;
  rem left side: the display;
  bin g;
  grid shape 6 1;
- grid rowheight 0 50; grid rowheight 1 25; grid rowheight 2 100; grid rowheight 3 100; grid rowheight 4 100; grid rowheight 5 25;
- grid rowstretch 0 1; grid rowstretch 1 1; grid rowstretch 2 2; grid rowstretch 3 2; grid rowstretch 3 2; grid rowstretch 5 1;
+ grid rowheight 0 30; grid rowheight 1 10; grid rowheight 2 200; grid rowheight 3 40; grid rowheight 4 40; grid rowheight 5 30;
+ grid rowstretch 0 2; grid rowstretch 1 1; grid rowstretch 2 4; grid rowstretch 3 2; grid rowstretch 3 2; grid rowstretch 5 2;
   rem top row: scores & login;
   bin h;
    bin h;
     bin s1;cc fmscoreadj0 edit center;set fmscoreadj0 inputmask #d;set fmscoreadj0 wh 20 20;bin s1;
-    cc fmscore0 static center;set fmscore0 minwh 40 40;set fmscore0 sizepolicy expanding;set fmscore0 font "Courier New" 128 bold;
+    cc fmscore0 static center;set fmscore0 minwh 20 20;set fmscore0 sizepolicy expanding;set fmscore0 font "Courier New" 64 bold;
    bin z;
    bin s;
    bin v;
-     cc fmlogin combobox;set fmlogin minwh 200 20;
-     cc fmloggedin static center;set fmloggedin minwh 300 30;;set fmloggedin sizepolicy expanding fixed;set fmloggedin font "Courier New" 16 bold;
+     cc fmlogin combobox;set fmlogin minwh 50 20;
+     cc fmloggedin static center;set fmloggedin minwh 50 30;set fmloggedin sizepolicy expanding fixed;set fmloggedin font "Courier New" 16 bold;
    bin z;
    bin s;
    bin h;
-    cc fmscore1 static center;set fmscore1 minwh 40 40;set fmscore1 sizepolicy expanding;set fmscore1 font "Courier New" 128 bold;
+    cc fmscore1 static center;set fmscore1 minwh 20 20;set fmscore1 sizepolicy expanding;set fmscore1 font "Courier New" 64 bold;
     bin s1;cc fmscoreadj1 edit center;set fmscoreadj1 inputmask #d;set fmscoreadj1 wh 20 20;bin s1;
    bin z;
   bin z;
   rem row 2: progress bar;
-  cc fmprogress progressbar 0 60 60;set fmprogress minwh 200 10;set fmprogress sizepolicy ignored fixed;
+  cc fmprogress progressbar 0 60 60;set fmprogress minwh 50 10;set fmprogress sizepolicy ignored fixed;
   rem row 3: general display;
   cc fmgeneral edith;set fmgeneral edit 0;set fmgeneral sizepolicy expanding;set fmgeneral font "Courier New" 32 bold;
   rem row 4: move to the next word;
   bin h;
-   cc fmretire4 button;set fmretire4 sizepolicy expanding;set fmretire4 font "Courier New" 64 bold;set fmretire4 text "Got It Late";
-   cc fmretire3 button;set fmretire3 sizepolicy expanding;set fmretire3 font "Courier New" 64 bold;set fmretire3 text "Time Expired";
-   cc fmretire0 button;set fmretire0 sizepolicy expanding;set fmretire0 font "Courier New" 64 bold;set fmretire0 text "Don't Know It"; 
-   cc fmretire1 button;set fmretire1 sizepolicy expanding;set fmretire1 font "Courier New" 64 bold;set fmretire1 text "Pass";
-   cc fmretire2 button;set fmretire2 sizepolicy expanding;set fmretire2 font "Courier New" 64 bold;set fmretire2 text "Got It";
+   cc fmretire4 button;set fmretire4 sizepolicy expanding;set fmretire4 font "Courier New" 24;set fmretire4 text "Got It Late";
+   bin s;
+   cc fmretire3 button;set fmretire3 sizepolicy expanding;set fmretire3 font "Courier New" 24;set fmretire3 text "Time Expired";
+   bin s;
+   cc fmretire0 button;set fmretire0 sizepolicy expanding;set fmretire0 font "Courier New" 24;set fmretire0 text "Don't Know It"; 
+   bin s;
+   cc fmretire1 button;set fmretire1 sizepolicy expanding;set fmretire1 font "Courier New" 24;set fmretire1 text "Pass";
+   bin s;
+   cc fmretire2 button;set fmretire2 sizepolicy expanding;set fmretire2 font "Courier New" 24;set fmretire2 text "Got It";
    bin z;
   rem row 5: general purpose buttons;
   bin h;
-   cc fmsieze0 button;set fmsieze0 sizepolicy expanding;set fmsieze0 font "Courier New" 32 bold;set fmsieze0 text ""; 
-   cc fmsieze1 button;set fmsieze1 sizepolicy expanding;set fmsieze1 font "Courier New" 32 bold;set fmsieze1 text ""; 
+   cc fmsieze0 button;set fmsieze0 sizepolicy expanding;set fmsieze0 font "Courier New" 24;set fmsieze0 text "";
+  bin s;
+   cc fmsieze1 button;set fmsieze1 sizepolicy expanding;set fmsieze1 font "Courier New" 24;set fmsieze1 text "";
   bin z;
   rem row 6: status line;
-  cc fmstatus static;set fmstatus sizepolicy ignored fixed;set fmstatus font "Courier New" 32 bold;
+  cc fmstatus editm readonly;set fmstatus sizepolicy preferred;set fmstatus font "Courier New" 32 bold;
  bin z;
  rem right side: event log;
  cc fmlog edith;set fmlog wrap;set fmlog sizepolicy expanding;
@@ -237,7 +242,7 @@ i. 0 0
 )
 
 NB. Order of processing state info
-statepri =: (;: 'Glogin Groundtimes Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordqueue Gwordundook Gscore Gtimedisp')
+statepri =: (;: 'Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordundook Gwordqueue Gbuttonblink Gscore Gtimedisp')
 NB. Process the command queue, which is a list of boxes.  Each box contains
 NB. the 5!:5 of a table of state information, as
 NB. infotype ; value
@@ -266,6 +271,30 @@ wd 'set fmloggedin text *', ('nobody'&[^:(0=#) Glogin) , ' is logged in'
 handGroundtimes =: 3 : 0
 wd 'set fmcharades60 checked ' , ": 60 = 1 { Groundtimes
 wd 'set fmcharades90 checked ' , ": 90 = 1 { Groundtimes
+''
+)
+
+handGturnblink =: 3 : 0
+if. Gturnblink do.
+  NB. Play an attention-getting animation
+  wd 'set fmgeneral font "Courier New" 256 bold;set fmgeneral text *<font color=#FF0000>RING</font>'
+  wd 'msgs'
+  6!:3 (0.1)
+  wd 'set fmgeneral font "Courier New" 192 bold;set fmgeneral text *<font color=#00FF00>RINGGG</font>'
+  wd 'msgs'
+  6!:3 (0.1)
+  wd 'set fmgeneral font "Courier New" 128 bold;set fmgeneral text *<font color=#0000FF>RINGGGGG</font>'
+  wd 'msgs'
+  6!:3 (0.1)
+  wd 'set fmgeneral font "Courier New" 96 bold;set fmgeneral text *<font color=#FFFF00>RINGGGGGGG</font>'
+  wd 'msgs'
+  6!:3 (0.1)
+  wd 'set fmgeneral font "Courier New" 64 bold;set fmgeneral text *<font color=#00FFFF>RINGGGGGGGG</font>'
+  wd 'msgs'
+  6!:3 (0.3)
+  wd 'set fmgeneral font "Courier New" 32 bold'
+  Gturnblink =: 0  NB. It shouldn't come twice, but take no chances
+end.
 ''
 )
 
@@ -318,31 +347,35 @@ case. GSLOGINOK do. text =. 'OK to login'
 case. GSAUTH do. text =. 'Waiting for authorization'
 case. GSWORDS do. text =. 'Players are entering words'
 case. GSWACTOR do.
-  NB. will post suggested next player
   wd 'set fmgeneral text *Next up: ' , ((Gteamup;0) {:: Gteams) , ' then ' , ((Gteamup;1) {:: Gteams)
   text =. 'Need player for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
 case. GSWSCORER do. text =. 'Need someone to score for ' , Gactor
 case. GSWSTART do.
-  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'You may fire when you are ready, Gridley.'
-  text =. 'Waiting for ' , Gscorer , ' to start the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
+  wd 'set fmgeneral text *' , (Glogin-:Gscorer) # 'You may fire when you are ready, Gridley.'
+  text =. Gscorer , ', start the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
 case. GSACTING do. text =. Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password') , ' and ' , ((Gactor -.@-: Gscorer) # Gscorer , ' is ') , 'scoring'
-case. GSPAUSE do. text =. 'Clock is stopped while ' , Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password')
-case. GSSETTLE do. text =. Gactor , ' is entering scores for the last words'
+case. GSPAUSE do. text =. 'Clock stopped - ' , Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password')
+case. GSSETTLE do. text =. Gactor , ' is finalizing scores'
 case. GSCONFIRM do.
-  NB. Extract the words that have been retired
-  rwords =. 1 {"1 (#~ 1 = (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words
-  wd 'set fmgeneral text *' , ((Glogin-:Gactor) # 'Click when the score is agreed.  ') , 'Words: ', _2 }. ; ,&', '&.> rwords
-  text =. 'Note the words, check the score'
+  NB. Extract the words that are being retired
+  rwords =. (#~ 1 = (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words.  wordqueue must be empty
+  if. #rwords do.
+    rwords =. <@(1&{:: , ' (late)' #~ 0 = (2;0)&{::)"1 rwords  NB. word text, with late words indicated
+    wd 'set fmgeneral text *' , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'Words: ', _2 }. ; ,&', '&.> rwords
+  else.
+    wd 'set fmgeneral text *' , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'No words were scored.'
+  end.
+  text =. ((*Gtimedisp) {:: 'End of turn';'Round change') , '.  Note words, check score'
 case. GSCHANGE do.
-  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Round change!  You will be playing ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
+  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Round change!  Next round: ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
   text =. 'Changing to ' , Groundno {:: 'Taboo';'Charades';'Password';'Scotch'
 case. GSCHANGEWACTOR do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Do you want a scorer for the ',(Groundno {:: 'Taboo';'Charades';'Password'),' round?'
   text =. 'Does ' , Gactor , ' need a scorer for ',(Groundno {:: 'Taboo';'Charades';'Password'),'?' 
 case. GSCHANGEWSCORER do. text =. 'Need someone to score for ' , Gactor
 case. GSCHANGEWSTART do.
-  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'You may fire when you are ready, Gridley.'
-  text =. 'Waiting for ' , Gscorer , ' to start the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
+  wd 'set fmgeneral text *' , (Glogin-:Gscorer) # 'You may fire when you are ready, Gridley.'
+  text =. Gscorer , ', start the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
 case. GSGAMEOVER do. text =. 'Game Over'
 case. do. text =. ''
 end.
@@ -426,26 +459,7 @@ handGlogtext =: 3 : 0
 wd 'set fmlog text *',Glogtext
 ''
 )
-ormbon_fmretire0_button =: 3 : 0
-backcmd 'NEXTWORD 0 _1'   NB. score, retirewd
-i. 0 0
-)
-formbon_fmretire1_button =: 3 : 0
-backcmd 'NEXTWORD _1 0'
-i. 0 0
-)
-formbon_fmretire2_button =: 3 : 0
-backcmd 'NEXTWORD 1 1'
-i. 0 0
-)
-formbon_fmretire3_button =: 3 : 0
-backcmd 'NEXTWORD 0 0'
-i. 0 0
-)
-formbon_fmretire4_button =: 3 : 0
-backcmd 'NEXTWORD 0 1'
-i. 0 0
-)
+
 
 handGwordqueue =: 3 : 0
 if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
@@ -486,6 +500,38 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM do.
   wd 'set fmsieze1 enable ',":loggedin*.en
 end.
 ''
+)
+
+handGbuttonblink =: 3 : 0
+NB. Turn off the blink in all states, to make sure it isn't left on
+if. Gbuttonblink -: '' do.
+  wd , 'p<set fmretire>q< font "Courier New" 24;>'  (8!:2) i. 5
+elseif. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) *. Glogin -.@-: Gscorer do.
+  NB. Blink only in word-scoring states, and not on the scorer's screen to avoid distraction
+  wd  'p<set fmretire>q< font "Courier New" 24 bold;>' (8!:2) (5 2 $0 _1  _1 0  1 1  0 0  0 1) i. Gbuttonblink
+end.
+''
+)
+
+formbon_fmretire0_button =: 3 : 0
+backcmd 'NEXTWORD 0 _1'   NB. score, retirewd
+i. 0 0
+)
+formbon_fmretire1_button =: 3 : 0
+backcmd 'NEXTWORD _1 0'
+i. 0 0
+)
+formbon_fmretire2_button =: 3 : 0
+backcmd 'NEXTWORD 1 1'
+i. 0 0
+)
+formbon_fmretire3_button =: 3 : 0
+backcmd 'NEXTWORD 0 0'
+i. 0 0
+)
+formbon_fmretire4_button =: 3 : 0
+backcmd 'NEXTWORD 0 1'
+i. 0 0
 )
 
 handGscore =: 3 : 0
@@ -569,6 +615,8 @@ formbon_fmcharades90_button =: 3 : 0
 backcmd 'RDTIME 1 90'
 i. 0 0
 )
+
+
 formbon_fmretire0_button =: 3 : 0
 backcmd 'NEXTWORD 0 _1'   NB. score, retirewd
 i. 0 0
@@ -589,6 +637,7 @@ formbon_fmretire4_button =: 3 : 0
 backcmd 'NEXTWORD 0 1'
 i. 0 0
 )
+
 formbon_fmsieze0_button =: 3 : 0
 if. 1 < #capt =. buttoncaptions0 {::~ 2 ; (0{::buttoncaptions0) i. Gstate do.
   NB. Replace ' with 'login'

@@ -161,7 +161,9 @@ if. #data do. qprintf'data 'end.
     gbls =. ".&.> gblifnames  NB. current values
     chgmsk =. gbls ~: Ggbls  NB. see what's different
     diffs =. (chgmsk # gblifnames) ,. chgmsk # gbls
-    Ggbls =: gbls  NB. save old state
+    Ggbls =: gbls  NB. save current values to be old state next time
+    Gbuttonblink =: ''  NB. this is a one-shot; clear after each change
+    Gturnblink =: 0  NB. Also a one-shot
     if. #diffs do.
 qprintf'diffs '
       chg =. 5!:5 <'diffs'  NB. Get data to send
@@ -227,7 +229,7 @@ i. 0 0
 sys_timer_z_ =: sys_timer_base_
 
 
-gblifnames =: ;:'Gstate Gscore Gdqlist Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin Gturnwordlist'
+gblifnames =: ;:'Gstate Gscore Gdqlist Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin Gturnwordlist Gbuttonblink Gturnblink'
 
 NB. Initial settings for globals shared with FE
 initstate =: 3 : 0
@@ -252,6 +254,8 @@ rejcmd =: ''  NB. set to a LOGINREJ cmd if we need one
 Ggbls =: 0:"0 gblifnames  NB. Init old copy = something that never matches a boxed value
 Gdqlist =. 0 3$a:
 Gturnwordlist =: 0 3$a:
+Gbuttonblink =: ''
+Gturnblink =: 0
 NB.?lintsaveglobals
 )
 initstate''
@@ -271,12 +275,20 @@ if. 1 = 0 ". y do. incrhwmk =: _1 end.  NB. if parm 1, reset the game state to e
 ''  NB. Nothing to send - functions as a tick
 )
 
+NB. y is the player logging in
 presyhLOGIN =: 3 : 0
-ourloginname =: ".y   NB. Remember who we're logging in... (y is uninterpreted here)
-ourlogintime =: 0   NB. wait for LOGINREQ
+name =. ".y  NB. y has not been interpreted
+NB. If the game has started, the name must be on a team
+if. (Gstate e. GSHELLO,GSLOGINOK,GSAUTH,GSWORDS) +. ((<name) e. ; Gteams) do.
+  ourloginname =: name   NB. Remember who we're logging in...
+  ourlogintime =: 0   NB. wait for LOGINREQ
+  Glogin =: ''  NB. not logged in now!
+  login =. 'LOGINREQ ' , y , CRLF   NB. start the login sequence
+else. login =. ''
+end.
 Glogin =: ''  NB. not logged in now!
-'LOGINREQ ' , y , CRLF   NB. start the login sequence
 NB.?lintsaveglobals
+login
 )
 
 presyhDEAL =: 3 : 0
@@ -305,7 +317,6 @@ res
 NB. y is sequence or CRLF-delimited commands from the server.  We process them one by one,
 NB. making changes to the globals as we go.  Then, we send the changed globals to the FE.
 postsync =: 3 : 0
-if. #y do. Glogtext =: Glogtext , y , '<br>' end.  NB. scaf
 ".@('postyh'&,);._2 y -. CR   NB. run em all
 NB. Send the changed names
 i. 0 0
@@ -479,7 +490,7 @@ NB. nilad
 postyhACT =: 3 : 0
 NB. Accept in WSTART or CHANGEWSTART
 if. Gstate e. GSWSTART,GSCHANGEWSTART do.
-  NB. go ACTING state.  If we were in START, start the timer.  This starts the turn
+  NB. go ACTING state.  If we were in START, start the timer.  This starts the turn.
   if. Gstate = GSWSTART do.
     Gtimedisp =: Groundno { Groundtimes
     NB. Gturnwordlist is the list of round;word;score for words that have been moved off the wordqueue.  Taken together, turnwordhist and Gwordqueue
@@ -488,6 +499,8 @@ if. Gstate e. GSWSTART,GSCHANGEWSTART do.
     NB.?lintonly Gturnwordlist =: ,: 1;'word';1 1
     NB. We save a copy of the exposedwords before we start so that we can delete words dismissed twice in a row
     prevexposedwords =: exposedwords
+    NB. Save the score for computing the player's total
+    prevscore =: Gscore
     NB. Move the acting player to the bottom of the priority list
     Gteams =: (< (Gteamup {:: Gteams) (-. , ]) <Gactor) Gteamup} Gteams
     NB.?lintonly prevexposedwords =: ,: 1;'word';1 1
@@ -555,6 +568,8 @@ if. (*@# Gwordqueue) *. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
   NB. If the word queue is still empty, that's a change of state: go to CONFIRM to accept the score and move on.  Keep the time
   NB.   on the timer
   if. isnewround'' do. Gstate =: GSCONFIRM end.
+  NB. Blink the pressed button as an ack to the team
+  Gbuttonblink =: score,retire  NB. This gets reset automatically
 end.
 ''
 )
@@ -593,8 +608,8 @@ end.
 
 NB. table of row;new score
 postyhSCOREMOD =: 3 : 0
-NB. Accept only if SETTLE
-if. Gstate = GSSETTLE do.
+NB. Accept only if SETTLE or CONFIRM
+if. Gstate e. GSSETTLE,GSCONFIRM do.
   edits =. y
   NB. This operates on the combined wordlist/queue.  Create that here and split again at the end
   wl =. Gturnwordlist , Gwordqueue
@@ -622,21 +637,21 @@ NB. Accept if in CONFIRM state
 if. Gstate = GSCONFIRM do.
   NB. If exposed and bag are empty, this actor gets no more words, so take the time away
   if. exposedwords +:&(*@#) wordbag do. Gtimedisp =: 0 end.
-    NB. Display & Discard words that have been passed twice in a row
-    oldpass =. ((0;0 _1) -:"1 (0 2) {"1 prevexposedwords) # 1 {"1 prevexposedwords
-    newpass =. ((0;0 _1) -:"1 (0 2) {"1 Gturnwordlist) # 1 {"1 Gturnwordlist
-    retired =. newpass (e. # [) oldpass  NB. words passed twice in a row in the first round
-    Glogtext =: Glogtext , ;@:(('discarded: ' , '<br>' ,~ ])&.>) retired
-    Gturnwordlist =: (retired -.@e.~ 1 {"1 Gturnwordlist) # Gturnwordlist
-    wordbag =: (retired -.@e.~ 1 {"1 wordbag) # wordbag
-    Gdqlist =: (retired -.@e.~ 1 {"1 Gdqlist) # Gdqlist
+  NB. Display & Discard words that have been passed twice in a row
+  oldpass =. ((0;0 _1) -:"1 (0 2) {"1 prevexposedwords) # 1 {"1 prevexposedwords
+  newpass =. ((0;0 _1) -:"1 (0 2) {"1 Gturnwordlist) # 1 {"1 Gturnwordlist
+  retired =. newpass (e. # [) oldpass  NB. words passed twice in a row in the first round
+  Glogtext =: Glogtext , ;@:(('discarded: ' , '<br>' ,~ ])&.>) retired
+  Gturnwordlist =: (retired -.@e.~ 1 {"1 Gturnwordlist) # Gturnwordlist
+  wordbag =: (retired -.@e.~ 1 {"1 wordbag) # wordbag
+  Gdqlist =: (retired -.@e.~ 1 {"1 Gdqlist) # Gdqlist
 
-    NB. Display & Discard words that have been marked as retired
-    handledmsk =. 1 = (2;1)&{::"1 Gturnwordlist  NB. words we finished
-    Gdqlist =: ((2 {."1 Gdqlist) -.@e. (handledmsk # 2 {."1 Gturnwordlist)) # Gdqlist  NB. Remove words we are showing now
-    htl =. handledmsk # Gturnwordlist  NB. the words we show everyone now
-    Glogtext =: Glogtext , ((2;0)&{::"1 htl) ;@:(({::&('guessed late: ';'guessed: ')@[ , '<br>' ,~ ])&.>) 1 {"1 htl
-    Gturnwordlist =: (-. handledmsk) # Gturnwordlist  NB. The  words have now passed on
+  NB. Display & Discard words that have been marked as retired
+  handledmsk =. 1 = (2;1)&{::"1 Gturnwordlist  NB. words we finished
+  Gdqlist =: ((2 {."1 Gdqlist) -.@e. (handledmsk # 2 {."1 Gturnwordlist)) # Gdqlist  NB. Remove words we are showing now
+  htl =. handledmsk # Gturnwordlist  NB. the words we show everyone now
+NB. no more  Glogtext =: Glogtext , ((2;0)&{::"1 htl) ;@:(({::&('guessed late: ';'guessed: ')@[ , '<br>' ,~ ])&.>) 1 {"1 htl
+  Gturnwordlist =: (-. handledmsk) # Gturnwordlist  NB. The  words have now passed on
   if. Gtimedisp=0 do.
     NB. if no time left, handle end-of-turn
     NB. Put the remaining turn words into the exposed list
@@ -652,6 +667,8 @@ if. Gstate = GSCONFIRM do.
     Gstate =: GSCHANGE
     Groundno =: nextroundno''  NB. set new round# before going to CHANGE state
   else.
+    NB. This is where end-of-turn happens.  Give the player's score
+    Glogtext =: Glogtext , Gactor , , 'p<: >q{ points<br>}' 8!:2 Gscore -&(Gteamup&{) prevscore
     NB. Should be out of time, since there are no words to act.  Clear time just in case, and go look for next actor, from the other team
     Gtimedisp =: 0 [ Gteamup =: -. Gteamup [ Gstate =: GSWACTOR [ Groundno =: nextroundno''
   end. 
@@ -672,7 +689,7 @@ postyhSCOREADJ =: 3 : 0
 NB. Accept during SETTLE or CONFIRM only
 if. Gstate e. GSSETTLE,GSCONFIRM do.
   Gscore =: (incr + team { Gscore) team} Gscore
-  if. *@# name do. Glogtext =: Glogtext , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' points' , ((incr>0){::' from ';' to ') , 'team ' , (":team) , '<br>' end.
+  if. *@# name do. Glogtext =: Glogtext , '<font color=red>' , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' points' , ((incr>0){::' from ';' to ') , 'team ' , (":team) , '</font><br>' end.
 end.
 ''
 )
@@ -691,7 +708,7 @@ else.
     NB. Apply change
     Gtimedisp =: 0 >. Gtimedisp + incr
     NB. Log it
-    if. *@# name do. Glogtext =: Glogtext , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' seconds ' , '<br>' end.
+    if. *@# name do. Glogtext =: Glogtext , '<font color=red>' , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' seconds ' , '</font><br>' end.
     NB. Changing the clock-zero status is a change of state.
     if. prevtime ~:&* Gtimedisp do.
       if. Gtimedisp do.
@@ -706,6 +723,7 @@ else.
         end.
       else.
         NB. Transitioning from some time to no time, i. e. the buzzer sounds.  If bothing to be scored, CONFIRM, otherwise SETTLE
+        Gturnblink =: 1  NB. Call for the buzzer
         Gstate =: (Gturnwordlist +.&(*@#) Gwordqueue) { GSCONFIRM,GSSETTLE
       end.
     end.
