@@ -88,9 +88,20 @@ menu fmteamdeal "Deal random teams";
 menusep;
 menu fmstart "Start playing";
 menusep;
-menupop "Time for charades";
+menupop "Time for taboo...";
+menu fmtaboo60 "60 seconds";
+menu fmtaboo90 "90 seconds";
+menu fmtaboo120 "120 seconds";
+menupopz;
+menupop "Time for charades...";
 menu fmcharades60 "60 seconds";
 menu fmcharades90 "90 seconds";
+menu fmcharades120 "120 seconds";
+menupopz;
+menupop "Time for password...";
+menu fmpassword60 "60 seconds";
+menu fmpassword90 "90 seconds";
+menu fmpassword120 "120 seconds";
 menupopz;
 menupopz;
 bin g;
@@ -160,9 +171,8 @@ rc =. sdconnect_jsocket_ sk;(}.thismachine),<8090  NB. start connecting
 qprintf'sk '
 if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';4000 do. 'Error connecting to background' 13!:8 (4) end.
 NB. Start with a message to say we arrived.  The response must set all our globals
+Gstate =: GSHELLO  NB. initial state to help ignoring one-shots
 backcmd 'HELLO ',":cleargame
-Gbuttonblink =: ''  NB. Avoid one-shots on first login, since there was nothing to reset them
-Gturnblink =: 0
 cleargame=:0  NB. Don't do it again accidentally
 wd :: 0: 'psel formbon;pclose'
 wd FORMBON
@@ -254,11 +264,14 @@ NB. We collect all the changed values for all commands before we drive any of th
 NB. y cannot be empty
 proccmds =: 3 : 0
 qprintf'y '
+initing =. Gstate=GSHELLO  NB. set if this is the very first call
 NB. Turn each input into a boxed table of name ; value
 NB. Run the tables together, keep the latest of each
 cmds =. ((~.@[ ,. ({:/. {:"1))~ {."1) ; ".&.> y
 NB. Assign values to names
 ({."1 cmds) =: {:"1 cmds
+if. initing do. Gbuttonblink =: '' [ Gturnblink =: 0 end.  NB. turn off one-shots, which are sticky, if in initial state
+
 NB. Start with the lowest modified state, and then all handlers till the end.  May be none
 wd 'psel formbon'
 for_h. statepri (<./@:i. }. [) {."1 cmds do. ('hand',>h)~ '' end.
@@ -271,8 +284,7 @@ wd 'set fmloggedin text *', ('nobody'&[^:(0=#) Glogin) , ' is logged in'
 )
 
 handGroundtimes =: 3 : 0
-wd 'set fmcharades60 checked ' , ": 60 = 1 { Groundtimes
-wd 'set fmcharades90 checked ' , ": 90 = 1 { Groundtimes
+(3 # 'taboo';'charades';'password') ([: wd 'set fm' , >@[ , ":@{.@] , ' checked ' , ":@{:@])"_1 ,/ Groundtimes (]"0/ ,"0 =/) 60 90 120
 ''
 )
 
@@ -280,13 +292,14 @@ handGturnblink =: 3 : 0
 if. Gturnblink do.
   NB. Play an attention-getting animation
   for_color. '0123456789ABCDEF' {~ 20 6 ?@$ 16 do.
-    fsize =. 128 + ? 128
+    fsize =. 192 + ? 64
     wlen =. 4 + ?5
     wchars =. 'RING' [^:(?2) wlen ((?@$ #) { ]) '!@#$%^&*()AgdrwTGdfsvDFHJYTSIGFTBSDL'
     wd 'set fmgeneral font "Courier New" ' , (":fsize) , ' bold;set fmgeneral text *<font color=#' , color , '>',wchars,'</font>'
     wd 'msgs'
-    6!:3 (0.05)
+    6!:3 (0.06)
   end.
+  wd 'set fmgeneral font "Courier New" 32 bold'  NB. Reset for normal use
   Gturnblink =: 0  NB. It shouldn't come twice, but take no chances
 end.
 ''
@@ -507,27 +520,6 @@ end.
 ''
 )
 
-formbon_fmretire0_button =: 3 : 0
-backcmd 'NEXTWORD 0 _1'   NB. score, retirewd
-i. 0 0
-)
-formbon_fmretire1_button =: 3 : 0
-backcmd 'NEXTWORD _1 0'
-i. 0 0
-)
-formbon_fmretire2_button =: 3 : 0
-backcmd 'NEXTWORD 1 1'
-i. 0 0
-)
-formbon_fmretire3_button =: 3 : 0
-backcmd 'NEXTWORD 0 0'
-i. 0 0
-)
-formbon_fmretire4_button =: 3 : 0
-backcmd 'NEXTWORD 0 1'
-i. 0 0
-)
-
 handGscore =: 3 : 0
 wd 'set fmscore0 text ',(":0 { Gscore),';set fmscore1 text ',":1 { Gscore
 ''
@@ -601,6 +593,20 @@ formbon_fmstart_button =: 3 : 0
 backcmd 'START ''' , Glogin , ''''
 i. 0 0
 )
+
+
+formbon_fmtaboo60_button =: 3 : 0
+backcmd 'RDTIME 0 60'  NB. rd#, # seconds
+i. 0 0
+)
+formbon_fmtaboo90_button =: 3 : 0
+backcmd 'RDTIME 0 90'
+i. 0 0
+)
+formbon_fmtaboo120_button =: 3 : 0
+backcmd 'RDTIME 0 120'
+i. 0 0
+)
 formbon_fmcharades60_button =: 3 : 0
 backcmd 'RDTIME 1 60'  NB. rd#, # seconds
 i. 0 0
@@ -609,6 +615,23 @@ formbon_fmcharades90_button =: 3 : 0
 backcmd 'RDTIME 1 90'
 i. 0 0
 )
+formbon_fmcharades120_button =: 3 : 0
+backcmd 'RDTIME 1 120'
+i. 0 0
+)
+formbon_fmpassword60_button =: 3 : 0
+backcmd 'RDTIME 2 60'  NB. rd#, # seconds
+i. 0 0
+)
+formbon_fmpassword90_button =: 3 : 0
+backcmd 'RDTIME 2 90'
+i. 0 0
+)
+formbon_fmpassword120_button =: 3 : 0
+backcmd 'RDTIME 2 120'
+i. 0 0
+)
+
 
 
 formbon_fmretire0_button =: 3 : 0
