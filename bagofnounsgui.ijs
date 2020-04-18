@@ -121,8 +121,9 @@ grid colstretch 0 5; grid colstretch 1 1;
    bin z;
    bin s;
    bin v;
-     cc fmlogin combobox;set fmlogin minwh 50 20;
-     cc fmloggedin static center;set fmloggedin minwh 50 30;set fmloggedin sizepolicy expanding fixed;set fmloggedin font "Courier New" 16 bold;
+     cc fmslowconn static center;set fmslowconn minwh 80 30;set fmslowconn sizepolicy expanding fixed;set fmslowconn font "Courier New" 24 bold;
+     cc fmlogin combobox;set fmlogin minwh 80 20;;set fmlogin sizepolicy expanding fixed;
+     cc fmloggedin static center;set fmloggedin minwh 80 30;set fmloggedin sizepolicy expanding fixed;set fmloggedin font "Courier New" 16 bold;
    bin z;
    bin s;
    bin h;
@@ -191,6 +192,7 @@ wd 'pclose'
 )
 formbon_cancel =: formbon_close
 
+heartbeatrcvtime =: _  NB. time previous heartbeat was received
 formbon_timer =: 3 : 0
 try.
 if. nextheartbeat < 6!:1'' do.
@@ -198,35 +200,46 @@ if. nextheartbeat < 6!:1'' do.
   nextheartbeat =: nextheartbeat + 1.   NB. schedule next heartbeat
 end.
 if. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.
-smoutput'data from BE '
   cmdqueue =. 0$a:   NB. list of commands in this batch
   hdr =. ''   NB. No data, no bytes of header
   while. do.   NB. Read all the commands that are queued
     NB. There is data to read.  Read it all, until we have the complete message.  First 4 bytes are the length
     while. 4>#hdr do.
       'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
-      if. rc~:0 do. 'Error reading from background' 13!:8 (4) end.
-      if. 0=#data do. 'Connection closed by background, restart' 13!:8 (5) end.
+      if. (rc~:0) +. (0=#data) do.
+        wd 'psel formbon;wd set fmslowconn text*Comm to background failed.  Close & restart'
+        ('Comm error, rc=',(":rc),' datalen=',":#data) 13!:8 (4)
+      end.
       hdr =. hdr , data
       if. 4=#hdr do. break. end.
-      if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';4000 do. 'Error reading from background' 13!:8 (4) end.
+      if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';4000 do. 'Timeout reading length from background' 13!:8 (4) end.
     end.
     hlen =. _2 (3!:4) hdr   NB. Number of bytes to read
+    if. 0=hlen do. break. end.  NB. 0-length message is a heartbeat, skip it
+smoutput'data from BE '  NB. scaf
     readdata =. ''
     while. do.
       'rc data' =. sdrecv_jsocket_ sk,(4+hlen),00   NB. Read the data
-      if. rc~:0 do. 'Error reading from background' 13!:8 (4) end.
-      if. 0=#data do. 'Connection closed by background, restart' 13!:8 (5) end.
+      if. (rc~:0) +. (0=#data) do.
+        wd 'psel formbon;wd set fmslowconn text*Comm to background failed on data.  Close & restart'
+        ('Comm error, rc=',(":rc),' datalen=',":#data) 13!:8 (4)
+      end.
       hlen =. hlen-#data  NB. decr count left
       if. hlen <: 0 do. cmdqueue =. cmdqueue , < readdata , hlen }. data break. end.
       readdata =. readdata , data
-      if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';4000 do. 'Error reading from background' 13!:8 (4) end.
+      if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';4000 do. 'Timeout reading data from background' 13!:8 (4) end.
     end.
     if. hlen=0 do. break. end.
     hdr =. hlen {. data
   end.
   wd 'psel formbon'
-  proccmds cmdqueue
+  heartbeatrcvtime =: 6!:1''  NB. Indicate when we received a heartbeat
+  if. #cmdqueue do. proccmds cmdqueue end.  NB. Ignore empty heartbeat
+end.
+NB. See if the connection is slow
+if. 2 < responsetime =. (6!:1'') - heartbeatrcvtime do.
+  wd 'set fmslowconn text *Slow connection' , (responsetime>4.) # ' ' , (, ':'&,)&(_2&({.!.'0')@":)/ 60 60 #: <. responsetime
+else. wd 'set fmslowconn text ""'  NB. Clear message if OK
 end.
 catch.
   wd'psel formbon;ptimer 0'
@@ -347,7 +360,7 @@ NB. Set all the enables
 NB. Set display for the variable buttons
 wd 'set fmsieze0 text *' , (1;((0{::buttoncaptions0) i. Gstate)) {:: buttoncaptions0
 wd 'set fmsieze1 text *' , (1;((0{::buttoncaptions1) i. Gstate)) {:: buttoncaptions1
-if. Gstate -.@e. GSSETTLE,CSCONFIRM do. wd 'set fmscoreadj0 text "";set fmscoreadj1 text ""' end.
+if. Gstate -.@e. GSSETTLE,GSCONFIRM do. wd 'set fmscoreadj0 text "";set fmscoreadj1 text ""' end.
 NB. Display the status line; if the general line is known from the state, do it too
 select. Gstate
 case. GSHELLO do. text =. 'Catching up'

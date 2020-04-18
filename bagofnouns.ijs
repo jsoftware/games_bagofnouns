@@ -63,7 +63,7 @@ NB. Wait for hello
 sockloop lsk;tourn;password
 )
 
-NB. Return 1 if error
+NB. Return non0 if error
 sockpoll =: 3 : 0
 'qbm sk tourn password' =. y
 feconnlost=.0
@@ -77,7 +77,7 @@ cmdqueue =. 0$a:  NB. List of commands
 while. do.
   while. 4>#hdr do.
     'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
-    if. 0{::rc do. 'Error ',(":0{::rc),' reading from frontend' 13!:8 (4) end.
+    if. 0{::rc do. ('Error ',(":0{::rc),' reading from frontend') 13!:8 (4) end.
     if. 0=#data do. feconnlost=.1 break. end.
     hdr =. hdr , data
     if. 4=#hdr do. break. end.
@@ -164,17 +164,20 @@ if. #data do. qprintf'data 'end.
     Ggbls =: gbls  NB. save current values to be old state next time
     Gbuttonblink =: ''  NB. this is a one-shot; clear after each change
     Gturnblink =: 0  NB. Also a one-shot
+    NB. Return the changes; if none, return a 0-length heartbeat
     if. #diffs do.
-qprintf'diffs '
+      nwdiffs =. (#~   (<'Gwordstatus') ~: {."1) diffs   NB. scaf
+      qprintf'nwdiffs '
       chg =. 5!:5 <'diffs'  NB. Get data to send
-      senddata =. (2 (3!:4) #chg) , chg   NB. prepend length
-      while. #senddata do.
-        if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';5000 do. 9 return.  end.
-        rc =. senddata sdsend_jsocket_ sk,0
-        if. 0{::rc do. 0{::rc return. end.
-        if. (#senddata) = 1{::rc do. break. end.
-        senddata =. (1{::rc) }. senddata
-      end.
+    else. chg=.''  NB. if no diffs, send heartbeat
+    end.
+    senddata =. (2 (3!:4) #chg) , chg   NB. prepend length
+    while. #senddata do.
+      if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';5000 do. 9 return.  end.
+      rc =. senddata sdsend_jsocket_ sk,0
+      if. 0{::rc do. 0{::rc return. end.
+      if. (#senddata) = 1{::rc do. break. end.
+      senddata =. (1{::rc) }. senddata
     end.
   end.
 end.
@@ -214,6 +217,7 @@ end.
 sys_timer  =: 3 : 0
 try. rc =. sockpoll timerpms
 if. rc do.  NB. scaf
+  sdclose_jsocket_ 1{::timerpms  NB. close fe socket before we rewait
   smoutput 'Error ' , (":rc) , ' on sockets'
   wd 'timer 0'
   sockloop lsk;2 3 { timerpms  NB. retry
@@ -228,6 +232,13 @@ i. 0 0
 )
 sys_timer_z_ =: sys_timer_base_
 
+NB. y is text to add, x is suffix (<br> if monad)
+addtolog =: 3 : 0
+'<br>' addtolog y
+:
+Glogtext =: Glogtext , y , x
+''
+)
 
 gblifnames =: ;:'Gstate Gscore Gdqlist Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin Gturnwordlist Gbuttonblink Gturnblink'
 
@@ -317,7 +328,7 @@ res
 NB. y is sequence or CRLF-delimited commands from the server.  We process them one by one,
 NB. making changes to the globals as we go.  Then, we send the changed globals to the FE.
 postsync =: 3 : 0
-".@('postyh'&,);._2 y -. CR   NB. run em all
+". :: (addtolog@('Failed: '&,)) @('postyh'&,);._2 y -. CR   NB. run em all
 NB. Send the changed names
 i. 0 0
 )
@@ -641,7 +652,7 @@ if. Gstate = GSCONFIRM do.
   oldpass =. ((0;0 _1) -:"1 (0 2) {"1 prevexposedwords) # 1 {"1 prevexposedwords
   newpass =. ((0;0 _1) -:"1 (0 2) {"1 Gturnwordlist) # 1 {"1 Gturnwordlist
   retired =. newpass (e. # [) oldpass  NB. words passed twice in a row in the first round
-  Glogtext =: Glogtext , ;@:(('discarded: ' , '<br>' ,~ ])&.>) retired
+  '' addtolog ;@:(('discarded: ' , '<br>' ,~ ])&.>) retired
   Gturnwordlist =: (retired -.@e.~ 1 {"1 Gturnwordlist) # Gturnwordlist
   wordbag =: (retired -.@e.~ 1 {"1 wordbag) # wordbag
   Gdqlist =: (retired -.@e.~ 1 {"1 Gdqlist) # Gdqlist
@@ -668,7 +679,7 @@ NB. no more  Glogtext =: Glogtext , ((2;0)&{::"1 htl) ;@:(({::&('guessed late: '
     Groundno =: nextroundno''  NB. set new round# before going to CHANGE state
   else.
     NB. This is where end-of-turn happens.  Give the player's score
-    Glogtext =: Glogtext , Gactor , ': ' , (, '' 8!:2 Gscore -&(Gteamup&{) prevscore) , ' points<br>'
+    addtolog Gactor , ': ' , (, '' 8!:2 Gscore -&(Gteamup&{) prevscore) , ' points'
     NB. Should be out of time, since there are no words to act.  Clear time just in case, and go look for next actor, from the other team
     Gtimedisp =: 0 [ Gteamup =: -. Gteamup [ Gstate =: GSWACTOR [ Groundno =: nextroundno''
   end. 
@@ -689,7 +700,7 @@ postyhSCOREADJ =: 3 : 0
 NB. Accept during SETTLE or CONFIRM only
 if. Gstate e. GSSETTLE,GSCONFIRM do.
   Gscore =: (incr + team { Gscore) team} Gscore
-  if. *@# name do. Glogtext =: Glogtext , '<font color=red>' , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' points' , ((incr>0){::' from ';' to ') , 'team ' , (":team) , '</font><br>' end.
+  if. *@# name do. addtolog '<font color=red>' , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' points' , ((incr>0){::' from ';' to ') , 'team ' , (":team) , '</font>' end.
 end.
 ''
 )
@@ -708,7 +719,7 @@ else.
     NB. Apply change
     Gtimedisp =: 0 >. Gtimedisp + incr
     NB. Log it
-    if. *@# name do. Glogtext =: Glogtext , '<font color=red>' , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' seconds ' , '</font><br>' end.
+    if. *@# name do. addtolog '<font color=red>' , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' seconds ' , '</font>' end.
     NB. Changing the clock-zero status is a change of state.
     if. prevtime ~:&* Gtimedisp do.
       if. Gtimedisp do.
