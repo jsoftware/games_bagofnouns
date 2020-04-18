@@ -238,8 +238,8 @@ smoutput'data from BE '  NB. scaf
 end.
 NB. See if the connection is slow
 if. 2 < responsetime =. (6!:1'') - heartbeatrcvtime do.
-  wd 'set fmslowconn text *Slow connection' , (responsetime>4.) # ' ' , (, ':'&,)&(_2&({.!.'0')@":)/ 60 60 #: <. responsetime
-else. wd 'set fmslowconn text ""'  NB. Clear message if OK
+  wd 'psel formbon;set fmslowconn text *Slow connection' , (responsetime>4.) # ' ' , (, ':'&,)&(_2&({.!.'0')@":)/ 60 60 #: <. responsetime
+else. wd 'psel formbon;set fmslowconn text ""'  NB. Clear message if OK
 end.
 catch.
   wd'psel formbon;ptimer 0'
@@ -750,11 +750,12 @@ if. #checks =. (#~ (<,'1') = {:"1) wdq do.
   NB. Remove the values that have not changed
   if. #buttsels =. (2 {"1 Gturnwordlist , Gwordqueue) (] #~ ({:@] -.@-: ({~ {.))"_ 1) buttsels do.
     NB. Send the new values to the background
+    heartbeatrcvtime =: _   NB. Stifle message while this form was displayed
     backcmd 'SCOREMOD ' , 5!:5 <'buttsels'
   end.
 end.
 NB. Close the word form
-wd 'pclose'
+wd 'psel formsettle;pclose'
 )
 formsettle_cancel =: 3 : 'wd pclose'
 formsettle_close_button =: formsettle_cancel
