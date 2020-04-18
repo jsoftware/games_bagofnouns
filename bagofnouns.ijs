@@ -668,7 +668,7 @@ NB. no more  Glogtext =: Glogtext , ((2;0)&{::"1 htl) ;@:(({::&('guessed late: '
     Groundno =: nextroundno''  NB. set new round# before going to CHANGE state
   else.
     NB. This is where end-of-turn happens.  Give the player's score
-    Glogtext =: Glogtext , Gactor , , 'p<: >q{ points<br>}' 8!:2 Gscore -&(Gteamup&{) prevscore
+    Glogtext =: Glogtext , Gactor , ': ' , (, '' 8!:2 Gscore -&(Gteamup&{) prevscore) , ' points<br>'
     NB. Should be out of time, since there are no words to act.  Clear time just in case, and go look for next actor, from the other team
     Gtimedisp =: 0 [ Gteamup =: -. Gteamup [ Gstate =: GSWACTOR [ Groundno =: nextroundno''
   end. 

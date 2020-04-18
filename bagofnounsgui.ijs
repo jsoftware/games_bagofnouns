@@ -347,6 +347,7 @@ NB. Set all the enables
 NB. Set display for the variable buttons
 wd 'set fmsieze0 text *' , (1;((0{::buttoncaptions0) i. Gstate)) {:: buttoncaptions0
 wd 'set fmsieze1 text *' , (1;((0{::buttoncaptions1) i. Gstate)) {:: buttoncaptions1
+if. Gstate -.@e. GSSETTLE,CSCONFIRM do. wd 'set fmscoreadj0 text "";set fmscoreadj1 text ""' end.
 NB. Display the status line; if the general line is known from the state, do it too
 select. Gstate
 case. GSHELLO do. text =. 'Catching up'
@@ -543,12 +544,12 @@ i. 0 0
 )
 formbon_fmscoreadj0_button =: 3 : 0
 adj =. ": adjn =. {.!.0 (0)".fmscoreadj0
-if. adjn do. backcmd 'SCOREADJ 0;',adj,';''',Glogin'''' end.
+if. adjn do. backcmd 'SCOREADJ 0;',adj,';''',Glogin,'''' end.
 i. 0 0
 )
 formbon_fmscoreadj1_button =: 3 : 0
 adj =. ": adjn =. {.!.0 (0)".fmscoreadj1
-if. adjn do. backcmd 'SCOREADJ 1;',adj,';''',Glogin'''' end.
+if. adjn do. backcmd 'SCOREADJ 1;',adj,';''',Glogin,'''' end.
 i. 0 0
 )
 formbon_fmteamshow_button =: 3 : 0
