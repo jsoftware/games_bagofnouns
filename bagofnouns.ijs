@@ -289,15 +289,19 @@ if. 1 = 0 ". y do. incrhwmk =: _1 end.  NB. if parm 1, reset the game state to e
 NB. y is the player logging in
 presyhLOGIN =: 3 : 0
 name =. ".y  NB. y has not been interpreted
-NB. If the game has started, the name must be on a team
-if. (Gstate e. GSHELLO,GSLOGINOK,GSAUTH,GSWORDS) +. ((<name) e. ; Gteams) do.
-  ourloginname =: name   NB. Remember who we're logging in...
-  ourlogintime =: 0   NB. wait for LOGINREQ
-  Glogin =: ''  NB. not logged in now!
-  login =. 'LOGINREQ ' , y , CRLF   NB. start the login sequence
-else. login =. ''
+login =. ''
+NB. Empty name is Logout, ignore it
+if. #name do.
+  NB. If the game has started, the name must be on a team
+  if. (Gstate e. GSHELLO,GSLOGINOK,GSAUTH,GSWORDS) +. ((<name) e. ; Gteams) do.
+    ourloginname =: name   NB. Remember who we're logging in...
+    ourlogintime =: 0   NB. wait for LOGINREQ
+    login =. 'LOGINREQ ' , y , CRLF   NB. start the login sequence
+    Glogin =: '*'  NB. Indicate login pending
+  end.
+else. Glogin =: ''  NB. not logged in now!
 end.
-Glogin =: ''  NB. not logged in now!
+
 NB.?lintsaveglobals
 login
 )
@@ -353,6 +357,7 @@ postyhLOGINREJ =: 3 : 0
 if. y -: ourloginname do.  NB. Abort pending login if rejected anywhere (including here)
   ourloginname =: ''
   ourlogintime =: 0
+  Glogin =: ''  NB. remove login-pending status
 end.
 ''
 )
@@ -636,7 +641,7 @@ if. Gstate e. GSSETTLE,GSCONFIRM do.
   unscored =. a: = 2 {"1 wl
   Gturnwordlist =: (-. unscored) # wl
   Gwordqueue =: unscored # wl
-  NB. If the wordqueue is not empty, go to CONFIRM
+  NB. If the wordqueue is not empty, go to SETTLE, otherwise stay in CONFIRM
   Gstate =: (*@# Gwordqueue) { GSCONFIRM,GSSETTLE
 end.
 ''

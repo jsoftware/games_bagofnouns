@@ -123,7 +123,7 @@ grid colstretch 0 5; grid colstretch 1 1;
    bin v;
      cc fmslowconn static center;set fmslowconn minwh 80 30;set fmslowconn sizepolicy expanding fixed;set fmslowconn font "Courier New" 24 bold;
      cc fmlogin combobox;set fmlogin minwh 80 20;;set fmlogin sizepolicy expanding fixed;
-     cc fmloggedin static center;set fmloggedin minwh 80 30;set fmloggedin sizepolicy expanding fixed;set fmloggedin font "Courier New" 16 bold;
+     cc fmloggedin static center;set fmloggedin minwh 80 30;set fmloggedin sizepolicy expanding fixed;set fmloggedin font "Courier New" 10;
    bin z;
    bin s;
    bin h;
@@ -164,17 +164,8 @@ pas 0 0;
 cleargame=:0
 formbon_run =: 3 : 0
 sdcleanup_jsocket_''
-NB. Connect to the background
-sk =: 1 {:: sdsocket_jsocket_ ''
-thismachine =: sdgethostbyname_jsocket_ 'localhost'
-NB. sdioctl_jsocket_ sk , FIONBIO_jsocket_ , 1  NB. Make socket non-blocking
-rc =. sdconnect_jsocket_ sk;(}.thismachine),<8090  NB. start connecting
-qprintf'sk '
-if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';4000 do. 'Error connecting to background' 13!:8 (4) end.
-NB. Start with a message to say we arrived.  The response must set all our globals
-Gstate =: GSHELLO  NB. initial state to help ignoring one-shots
-backcmd 'HELLO ',":cleargame
-cleargame=:0  NB. Don't do it again accidentally
+conntoback 4000
+
 wd :: 0: 'psel formbon;pclose'
 wd FORMBON
 wd 'set fmretire0 text *Don''t',LF,'Know It'
@@ -182,64 +173,98 @@ wd 'set fmretire2 text *Got',LF,'It'
 wd 'set fmretire4 text *Got',LF,'It',LF,'Late'
 wd 'set fmretire3 text *Time',LF,'Expired'
 wd 'pshow'
+
 NB. Start a heartbeat
 nextheartbeat =: 6!:1''
 wd 'ptimer 50'
+''
 )
 
 formbon_close =: 3 : 0
-wd 'pclose'
+wd 'ptimer 0;pclose'
 )
 formbon_cancel =: formbon_close
+
+NB. Here when the background died.  We will keep trying to connect.  Clear the socket to indicate no connection  y is message ID to form, empty to suppress msg
+backdied =: 3 : 0
+if. sk do.
+  sdclose_jsocket_ sk
+  sk =: 0
+  if. #y do. wd 'psel formbon;set fmslowconn text *Comm to background failed (',(":y),').' end.
+end.
+''
+)
+
+NB. Try to establish connection to bg.  Return 0 if successful, and set sk.  y is connto in msec
+conntoback =: 3 : 0
+NB. Connect to the background
+sk =: 1 {:: sdsocket_jsocket_ ''
+thismachine =: sdgethostbyname_jsocket_ 'localhost'
+NB. sdioctl_jsocket_ sk , FIONBIO_jsocket_ , 1  NB. Make socket non-blocking
+rc =. sdconnect_jsocket_ sk;(}.thismachine),<8090  NB. start connecting
+if. sk e. 2 {:: sdselect_jsocket_ '';sk;'';y do.
+  NB. Start with a message to say we arrived.  The response must set all our globals
+  Gstate =: GSHELLO  NB. initial state to help ignoring one-shots
+  backcmd 'HELLO ',":cleargame
+  cleargame=:0  NB. Don't do it again accidentally
+  0
+else.
+  backdied 0  NB. Indicate no connection
+  1
+end.
+
+)
 
 heartbeatrcvtime =: _  NB. time previous heartbeat was received
 formbon_timer =: 3 : 0
 try.
-if. nextheartbeat < 6!:1'' do.
-  backcmd ''   NB. Send heartbeat msg every second
-  nextheartbeat =: nextheartbeat + 1.   NB. schedule next heartbeat
-end.
-if. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.
-  cmdqueue =. 0$a:   NB. list of commands in this batch
-  hdr =. ''   NB. No data, no bytes of header
-  while. do.   NB. Read all the commands that are queued
-    NB. There is data to read.  Read it all, until we have the complete message.  First 4 bytes are the length
-    while. 4>#hdr do.
-      'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
-      if. (rc~:0) +. (0=#data) do.
-        wd 'psel formbon;wd set fmslowconn text*Comm to background failed.  Close & restart'
-        ('Comm error, rc=',(":rc),' datalen=',":#data) 13!:8 (4)
-      end.
-      hdr =. hdr , data
-      if. 4=#hdr do. break. end.
-      if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';4000 do. 'Timeout reading length from background' 13!:8 (4) end.
-    end.
-    hlen =. _2 (3!:4) hdr   NB. Number of bytes to read
-    if. 0=hlen do. break. end.  NB. 0-length message is a heartbeat, skip it
-smoutput'data from BE '  NB. scaf
-    readdata =. ''
-    while. do.
-      'rc data' =. sdrecv_jsocket_ sk,(4+hlen),00   NB. Read the data
-      if. (rc~:0) +. (0=#data) do.
-        wd 'psel formbon;wd set fmslowconn text*Comm to background failed on data.  Close & restart'
-        ('Comm error, rc=',(":rc),' datalen=',":#data) 13!:8 (4)
-      end.
-      hlen =. hlen-#data  NB. decr count left
-      if. hlen <: 0 do. cmdqueue =. cmdqueue , < readdata , hlen }. data break. end.
-      readdata =. readdata , data
-      if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';4000 do. 'Timeout reading data from background' 13!:8 (4) end.
-    end.
-    if. hlen=0 do. break. end.
-    hdr =. hlen {. data
+if. sk=0 do.
+  NB. No bg connection yet, or connection lost - establish one
+  if. conntoback 4000 do.
+    smoutput 'cannot connect to background, retrying'
   end.
-  wd 'psel formbon'
-  heartbeatrcvtime =: 6!:1''  NB. Indicate when we received a heartbeat
-  if. #cmdqueue do. proccmds cmdqueue end.  NB. Ignore empty heartbeat
 end.
-NB. See if the connection is slow
-if. 2 < responsetime =. (6!:1'') - heartbeatrcvtime do.
-  wd 'psel formbon;set fmslowconn text *Slow connection' , (responsetime>4.) # ' ' , (, ':'&,)&(_2&({.!.'0')@":)/ 60 60 #: <. responsetime
-else. wd 'psel formbon;set fmslowconn text ""'  NB. Clear message if OK
+if. sk do.
+  if. nextheartbeat < 6!:1'' do.
+    backcmd ''   NB. Send heartbeat msg every second
+    nextheartbeat =: nextheartbeat + 1.   NB. schedule next heartbeat
+  end.
+  if. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.
+    cmdqueue =. 0$a:   NB. list of commands in this batch
+    hdr =. ''   NB. No data, no bytes of header
+    while. do.   NB. Read all the commands that are queued
+      NB. There is data to read.  Read it all, until we have the complete message.  First 4 bytes are the length
+      while. 4>#hdr do.
+        'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
+        if. (rc~:0) +. (0=#data) do. backdied 1 return. end.
+        hdr =. hdr , data
+        if. 4=#hdr do. break. end.
+        if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';4000 do. backdied 2 return. end.
+      end.
+      hlen =. _2 (3!:4) hdr   NB. Number of bytes to read
+      if. 0=hlen do. break. end.  NB. 0-length message is a heartbeat, skip it
+smoutput'data from BE '  NB. scaf
+      readdata =. ''
+      while. do.
+        'rc data' =. sdrecv_jsocket_ sk,(4+hlen),00   NB. Read the data
+        if. (rc~:0) +. (0=#data) do. backdied 3 return. end.
+        hlen =. hlen-#data  NB. decr count left
+        if. hlen <: 0 do. cmdqueue =. cmdqueue , < readdata , hlen }. data break. end.
+        readdata =. readdata , data
+        if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';4000 do. backdied 4 return. end.
+      end.
+      if. hlen=0 do. break. end.
+      hdr =. hlen {. data
+    end.
+    wd 'psel formbon'
+    heartbeatrcvtime =: 6!:1''  NB. Indicate when we received a heartbeat
+    if. #cmdqueue do. proccmds cmdqueue end.  NB. Ignore empty heartbeat
+  end.
+  NB. See if the connection is slow
+  if. 2 < responsetime =. (6!:1'') - heartbeatrcvtime do.
+    wd 'psel formbon;set fmslowconn text *Slow connection' , (responsetime>4.) # ' ' , (, ':'&,)&(_2&({.!.'0')@":)/ 60 60 #: <. responsetime
+  else. wd 'psel formbon;set fmslowconn text ""'  NB. Clear message if OK
+  end.
 end.
 catch.
   wd'psel formbon;ptimer 0'
@@ -247,7 +272,7 @@ catch.
   smoutput'error in timer handler'
   smoutput (<: 13!:11'') {:: 9!:8''
   smoutput 13!:12''
-  sdclose_jsocket_ sk  NB. If the background closed the socket, let it close properly
+  backdied''   NB. Wait for restart
 end.
 i. 0 0
 )
@@ -255,19 +280,21 @@ i. 0 0
 NB. Send the command in y, prefixed by length
 backcmd =: 3 : 0
 if. #y do. smoutput 'backcmd: ' , y end. NB. scaf
-senddata =. (2 (3!:4) #y) , y   NB. prefix the data with 4-byte length
-while. #senddata do.
-  if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';1000 do. 'Error writing to background' 13!:8 (4) end.
-  rc =. senddata sdsend_jsocket_ sk,0
-  if. 0~:0{::rc do. ('Error ',(":0{::rc),'writing to background') 13!:8 (4) end.
-  if. 0=byteswritten =. 1 {:: rc do. ('No data written to background') 13!:8 (4) end.
-  senddata =. byteswritten }. senddata
+NB. Skip this is background is dead
+if. sk do.
+  senddata =. (2 (3!:4) #y) , y   NB. prefix the data with 4-byte length
+  while. #senddata do.
+    if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';1000 do. backdied 5 return. end.
+    rc =. senddata sdsend_jsocket_ sk,0
+    if. 0~:0{::rc do. backdied 6 return. end.
+    senddata =. (1 {:: rc) }. senddata
+  end.
 end.
-i. 0 0
+''
 )
 
 NB. Order of processing state info
-statepri =: (;: 'Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordundook Gwordqueue Gbuttonblink Gscore Gtimedisp')
+statepri =: (;: 'Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordundook Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
 NB. Process the command queue, which is a list of boxes.  Each box contains
 NB. the 5!:5 of a table of state information, as
 NB. infotype ; value
@@ -292,8 +319,15 @@ for_h. statepri (<./@:i. }. [) {."1 cmds do. ('hand',>h)~ '' end.
 )
 NB. The handlers, in priority order.  They all return empty
 handGlogin =: 3 : 0
-loggedin =: *@#Glogin
-wd 'set fmloggedin text *', ('nobody'&[^:(0=#) Glogin) , ' is logged in'
+loggedin =: 3 < #Glogin
+if. Glogin -: '*' do.
+  wd 'set fmloggedin text *Login in progress...'
+elseif. loggedin do.
+  wd 'set fmloggedin text *' , Glogin , ' is logged in here'
+else.
+  wd 'set fmloggedin text *Login by selecting or entering your name'
+end.
+''
 )
 
 handGroundtimes =: 3 : 0
@@ -378,14 +412,6 @@ case. GSACTING do. text =. Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Char
 case. GSPAUSE do. text =. 'Clock stopped - ' , Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password')
 case. GSSETTLE do. text =. Gactor , ' is finalizing scores'
 case. GSCONFIRM do.
-  NB. Extract the words that are being retired
-  rwords =. (#~ 1 = (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words.  wordqueue must be empty
-  if. #rwords do.
-    rwords =. <@(1&{:: , ' (late)' #~ 0 = (2;0)&{::)"1 rwords  NB. word text, with late words indicated
-    wd 'set fmgeneral text *' , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'Words: ', _2 }. ; ,&', '&.> rwords
-  else.
-    wd 'set fmgeneral text *' , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'No words were scored.'
-  end.
   text =. ((*Gtimedisp) {:: 'End of turn';'Round change') , '.  Note words, check score'
 case. GSCHANGE do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Round change!  Next round: ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
@@ -433,8 +459,8 @@ GSCHANGEWSTART 'Undo!  I don''t*want to score'  'SCORER '';0'
 )
 
 handGteams =: 3 : 0
-wd 'set fmlogin items' , ;@:((' "' , ,&'"')&.>) (/: tolower&.>) ; Gteams
-wd 'set fmlogin select ' , ": # ; Gteams  NB. Make selection blank
+wd 'set fmlogin items' , ;@:((' "' , ,&'"')&.>) (<'Logout'),~^:loggedin (/: tolower&.>) ; Gteams
+wd 'set fmlogin select ' , ": >: # ; Gteams  NB. Make selection blank
 wd 'set fmstart enable ' , ": loggedin *. (Gstate=GSWORDS) *. (2=#Gteams)
 ''
 )
@@ -480,6 +506,21 @@ handGlogtext =: 3 : 0
 wd 'set fmlog text *',Glogtext
 ''
 )
+
+handGturnwordlist =: 3 : 0
+if. Gstate = GSCONFIRM do.   NB. display words in CONFIRM state, where they might be changed by a SCOREMOD without changing state
+  NB. Extract the words that are being retired
+  rwords =. (#~ 1 = (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words.  wordqueue must be empty
+  if. #rwords do.
+    rwords =. <@(1&{:: , ' (late)' #~ 0 = (2;0)&{::)"1 rwords  NB. word text, with late words indicated
+    wd 'set fmgeneral text *' , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'Words: ', _2 }. ; ,&', '&.> rwords
+  else.
+    wd 'set fmgeneral text *' , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'No words were scored.'
+  end.
+end.
+''
+)
+
 
 
 handGwordqueue =: 3 : 0
@@ -529,7 +570,7 @@ if. Gbuttonblink -: '' do.
   wd , 'p<set fmretire>q< font "Courier New" 24;>'  (8!:2) i. 5
 elseif. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) *. Glogin -.@-: Gscorer do.
   NB. Blink only in word-scoring states, and not on the scorer's screen to avoid distraction
-  wd  'p<set fmretire>q< font "Courier New" 24 bold;>' (8!:2) (5 2 $0 _1  _1 0  1 1  0 0  0 1) i. Gbuttonblink
+  wd  'p<set fmretire>q< font "Courier New" 32 bold;>' (8!:2) (5 2 $0 _1  _1 0  1 1  0 0  0 1) i. Gbuttonblink
 end.
 ''
 )
@@ -548,10 +589,16 @@ wd 'set fmretire4 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gactor)
 
 
 NB. Button processors
+LOGINCHARS =: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 formbon_fmlogin_select =: 3 : 0
-smoutput 'fmlogin'
-smoutput fmlogin
-smoutput fmlogin_select
+if. 'Logout'-:fmlogin do. fmlogin=:''  NB. Convert Logout to empty
+else.
+  NB. Audit login name: >:3 chars, only valid alphas, no spaces
+  if. (3>#fmlogin) +. (12<#fmlogin) +. # fmlogin -. LOGINCHARS do.
+    wd'mb info mb_ok "Invalid Login" "Must be 3-12 letters and numbers, no spaces"'
+    i. 0 0 return.
+  end.
+end.
 backcmd 'LOGIN ''',fmlogin,''''
 i. 0 0
 )
@@ -700,8 +747,8 @@ end.
 wds =. deb&.> (e.&DIRCHARS # ])&.> wds  NB. Remove weird characters, excess blanks
 wds =. wds -. a:  NB. Remove empty words
 if. 0=#wds do. wd'mb info mb_ok "No words" "You didn''t put any words on the clipboard."' return. end.
-if. 15<#wds do. wd'mb info mb_ok "Too many words" "You have too many words."' return. end.
-if. 30 < >./ #@> wds do. wd'mb info mb_ok "Too long" "One of your words is too long."' return. end.
+if. 15<#wds do. wd'mb info mb_ok "Too many words" "You have more than 15 words."' return. end.
+if. 30 < >./ #@> wds do. wd'mb info mb_ok "Too long" "One of your words is longer than 30 characters."' return. end.
 if. 'ok' -: tmb   =: wd'mb query mb_ok "Is this word list OK?" *', ; ,&LF&.> wds do.
   backcmd 'WORDS ''',Glogin,''' ,&< ' , 5!:5 <'wds'
 end.
