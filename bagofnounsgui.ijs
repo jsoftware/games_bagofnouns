@@ -522,22 +522,26 @@ end.
 )
 
 
-
+APSinstructions =: <;._2 (0 : 0)
+<small>Play in order.  Word stays red until scored:</small><ul>
+Clock is stopped - wait<ul>
+<small>Words left over.  Handle the word in red (usually Time Expired), or use big buttons to review scores.</small><ul>
+)
 handGwordqueue =: 3 : 0
 if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
   if. Glogin -: Gactor do.
     NB. Special display for the actor.  Prefix it with instructions
-    text =. ((GSACTING,GSPAUSE,GSSETTLE) i. Gstate){'Play these words in order:';'Clock is stopped - wait';'Score the word in red, or undo to change an earlier word:'
+    text =. ((GSACTING,GSPAUSE,GSSETTLE) i. Gstate) { APSinstructions
     if. #Gwordqueue do.
       NB. Show the queue, with an indication of how the words were scored, if they were
       words =. 1 {"1 Gwordqueue
       scoretag =. ((0 _1;_1 0;1 1;0 0;0 1) i. 2 {"1 Gwordqueue) { ' (didn''t know it)';' (passed -1)';' (scored +1)';' (time expired)';' (guessed late)';''
-      if. (Gstate=GSSETTLE) *. *@#words do. words =. (('<font color=red>' , ,&'</font>')&.> {. words) 0} words end.
-      text =. text , <@;"1 words,.scoretag
+      if. *@#words do. words =. (('<font color=red>' , ,&'</font>')&.> {. words) 0} words end.
+      text =. text , <@('<li>' , ;)"1 words,.scoretag
     else.
       NB. No words should be possible only in CONFIRM state
     end.
-    wd 'set fmgeneral text *' , ; ,&'<br>'&.> text
+    wd 'set fmgeneral text *' , ; text
   else.
     NB. For non-actors, indicate DQ status for the word, if there is still time
     if. Gstate e. GSACTING,GSPAUSE do.
