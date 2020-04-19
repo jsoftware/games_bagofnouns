@@ -2,14 +2,15 @@ require 'socket'
 require 'strings'
 require'format/printf'
 sdcleanup_jsocket_ =: 3 : '0[(sdclose ::0:"0@[ shutdownJ@(;&2)"0)^:(*@#)SOCKETS_jsocket_'
+
 NB. Game states
 GSHELLO =: 0  NB. Initial login at station: clear username, clear incrhwmk
 GSLOGINOK =: 1  NB. OK to log in
 GSAUTH =: 2  NB. Authenticating credentials
 NB. All the rest require a login to enable any buttons
 GSWORDS =: 3  NB. waiting for words to be entered
-GSWACTOR =: 4  NB. waiting for an actor
-GSWSCORER =: 5   NB. Waiting for a scorer
+GSWACTOR =: 4  NB. waiting for an actor.  Time has not started
+GSWSCORER =: 5   NB. Waiting for a scorer.  Time may have started
 GSWSTART =: 6   NB. Waiting for Start button
 GSACTING =: 7  NB. Acting words
 GSPAUSE =: 8   NB. Clock stopped during a round
@@ -29,14 +30,13 @@ DEAL    FE only
 TEAMS 'names' ; 'names'
 WORDS name ; 5!:5 'words'
 RDTIME rnd nsec
-AWAYSTATUS name [012] 
-TIMERADJ {01} incr name  stop/start, adj
+AWAYSTATUS [012] name
+TIMER {01} incr name  stop/start, adj
 NEXTWORD {-1 0 1} {01}   score, count wd as played
 PREVWORD
 COMMIT
 SCOREADJ incr name
 START name
-ACT name
 ACTOR name {01}  0 to undo
 SCORER name {01}  0 to undo
 LOGINREQ name gend by BE
@@ -45,784 +45,740 @@ TICK    gend by BE
 SHOWWORD word  gend by BE
 )
 
-NB. Info from BE
+
 0 : 0
-state
-score
-actor
-scorer
-teamup
-teams
-wordqueue
-wordundook
-timedisp
-roundno
-roundtimes
-awaystatus  list ; list   status1 status2
-wordstatus  table of word ; dqlist
-logtext
+startgame 't1000';'1111111'
+)
+startgame =: 3 : 0
+if. (,2) -.@-: $y do. 'Usage: startgame ''tourn-name'';''password''' return. end.
+if. 32 ~: 3!:0 y do. 'Usage: startgame ''tourn-name'';''password''' return. end.
+if. +./ 2 ~: 3!:0@> y do. 'Usage: startgame ''tourn-name'';''password''' return. end.
+initstate''
+'tourn password' =: y
+sdcleanup_jsocket_''  NB. debugging
+lsk =: 1 {:: sdsocket_jsocket_ ''  NB. listening socket
+rc =. sdbind_jsocket_ lsk ; AF_INET_jsocket_ ; '' ; 8090  NB. listen on port 8090 
+if. 0~:rc do. ('Error ',(":rc),'binding to 8090') 13!:8 (4) end.
+NB. Wait for hello
+sockloop lsk;tourn;password
+)
+
+NB. Return non0 if error
+sockpoll =: 3 : 0
+'qbm sk tourn password' =. y
+feconnlost=.0
+NB. Wait for a pulse from the front end
+if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.  NB. allow long time for dialog box
+  0 return.  NB. scaf poll again - in real system use a long timeout and fail here
+end.
+NB. There is data to read.  Read it all, until we have the complete message(s).  First 4 bytes are the length
+hdr =. ''   NB. No data, no bytes of header
+cmdqueue =. 0$a:  NB. List of commands
+while. do.
+  while. 4>#hdr do.
+    'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
+    if. 0{::rc do. ('Error ',(":0{::rc),' reading from frontend') 13!:8 (4) end.
+    if. 0=#data do. feconnlost=.1 break. end.
+    hdr =. hdr , data
+    if. 4=#hdr do. break. end.
+    if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.4 break. end.
+  end.
+  if. feconnlost do. break. end.
+  hlen =. _2 (3!:4) hdr   NB. Number of bytes to read - could be 0
+  readdata =. ''
+  while. hlen > 0 do.
+    if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.2 break. end.
+    'rc data' =. sdrecv_jsocket_ sk,(4+hlen),00   NB. Read the data, plus the next length
+    if. rc~:0 do. rc return. end.
+    if. 0=#data do. feconnlost=.3 break. end.
+    readdata =. readdata , data
+    hlen=.hlen-#data  NB. when we have all the data, plus possibly the next length
+  end.
+  if. feconnlost do. break. end.
+  NB. If there is not another command, exit to process them
+  cmdqueue =. cmdqueue , < hlen }. readdata
+  if. hlen >: 0 do. break. end.  NB. >0 only if error
+  hdr =. hlen {. readdata  NB. transfer the length
+  if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.5 break. end.
+end.
+if. feconnlost do. feconnlost [ wd 'timer 0' [ smoutput 'fe connection lost'  return. end.
+NB. perform pre-sync command processing
+if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
+senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('INCR "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
+NB. Create a connection to the server and send all the data in an INCR command
+sendstarttime =. 6!:1''  NB. scaf
+for_dly. 1 1 300 # 1000 2000 3000 do.
+  NB.?lintloopbodyalways
+  ssk =. 1 {:: sdsocket_jsocket_ ''  NB. listening socket
+  sdioctl_jsocket_ ssk , FIONBIO_jsocket_ , 1  NB. Make socket non-blocking
+  rc =. sdconnect_jsocket_ ssk;qbm,<8090
+  if. ssk e. sds   =. 2 {:: sdselect_jsocket_ '';ssk;'';dly do. break. end.
+  sdclose_jsocket_ ssk
+  smoutput 'Error ' , (":rc) , ' connecting to server'
+  qbm2 =. }. sdgethostbyname_jsocket_ 'www.quizbowlmanager.com'  NB. In case the address changed
+  if. _1 {:: qbm2 -.@-: '255.255.255.255' do. qbm =. qbm2 end.  NB. Save new address, if it is valid
+  ssk =. 0
+end.
+if. ssk=0 do.  NB. uncorrectable server error
+  7 return.
+end.
+NB. Send the data.  Should always go in one go
+while. #senddata do.
+  rc =. senddata sdsend_jsocket_ ssk,0
+  if. 0{::rc do. 0{::rc return. end.
+  if. (#senddata) = 1{::rc do. break. end.
+  senddata =. (1{::rc) }. senddata
+  if. -. ssk e. 2 {:: sdselect_jsocket_ '';ssk;'';5000 do. rc =. 1;'' break. end.
+end.
+if. 0{::rc do. 8 [ sdclose_jsocket_ ssk return. end.  NB. error sending - what's that about?  Abort
+NB. Read the response, until the server closes
+readdata =. ''
+while. do.
+  for. i. 3 do.
+    NB.?lintloopbodyalways
+    rsockl =. 1 {:: sdselect_jsocket_ ssk;'';ssk;4000
+    if. ssk e. rsockl do. break. end.  NB. should respond quickly
+    smoutput '4s timeout from server'
+  end.
+  if. -. ssk e. rsockl do. readdata =. '' break. end.  NB. Exit with empty data as error flag
+  'rc data' =. sdrecv_jsocket_ ssk,10000,0
+  if. rc do. rc return. end.
+  if. 0=#data do. break. end.  NB. Normal exit: host closes connection
+  readdata =. readdata , data  NB. Accumulate reply
+end.
+if. 0.3 < sendstarttime =. (6!:1'') - sendstarttime do. smoutput 'server delay=',":sendstarttime end.  NB. scaf
+sdclose_jsocket_ ssk
+if. #readdata do.
+  NB. Verify response validity.
+  NB. If we don't get a valid response, the game is in an unknown state.  There's nothing good to do, so we
+  NB. will ignore the response and continue, hoping that the host correctly logged our data
+  'rc data' =. fileserv_decrsphdr_sockfileserver_ readdata
+  NB. Process the response
+  if. (rc=0) do.   NB. to handle login seq we must pass heartbeats through
+if. #data do. qprintf'data 'end.
+    incrhwmk   =: (0 >.incrhwmk) + #data  NB.Since we processed it, skip over this data in the future
+    postsync data
+    NB. Send new state info to the front end
+    gbls =. ".&.> gblifnames  NB. current values
+    chgmsk =. gbls ~: Ggbls  NB. see what's different
+    diffs =. (chgmsk # gblifnames) ,. chgmsk # gbls
+    Ggbls =: gbls  NB. save current values to be old state next time
+    Gbuttonblink =: ''  NB. this is a one-shot; clear after each change
+    Gturnblink =: 0  NB. Also a one-shot
+    NB. Return the changes; if none, return a 0-length heartbeat
+    if. #diffs do.
+      nwdiffs =. (#~   (<'Gwordstatus') ~: {."1) diffs   NB. scaf
+      qprintf'nwdiffs '
+      chg =. 5!:5 <'diffs'  NB. Get data to send
+    else. chg=.''  NB. if no diffs, send heartbeat
+    end.
+    senddata =. (2 (3!:4) #chg) , chg   NB. prepend length
+    while. #senddata do.
+      if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';5000 do. 9 return.  end.
+      rc =. senddata sdsend_jsocket_ sk,0
+      if. 0{::rc do. 0{::rc return. end.
+      if. (#senddata) = 1{::rc do. break. end.
+      senddata =. (1{::rc) }. senddata
+    end.
+  end.
+end.
+NB. If we did not read a response, quietly discard it
+0
+)
+
+NB. Loop forever reading/writing sockets. y is the socket we are listening on.
+NB. We wait for the game to connect.  If it goes away, we wait again
+sockloop =: 3 : 0
+'lsk tourn password' =. y
+while. do.   NB. loop here forever
+  smoutput 'Waiting for connection'
+  incrhwmk   =: 0  NB. where we are in the host log
+  qbm =. }. sdgethostbyname_jsocket_ 'www.quizbowlmanager.com'
+  sdlisten_jsocket_ lsk,1
+  sdselect_jsocket_ lsk;'';'';6000000   NB. Wait till front-end attaches
+  rc =. sdaccept_jsocket_ lsk  NB. Create the clone
+  if. 0~:0{::rc do. ('Error ',(":0{::rc),'connecting to frontend') 13!:8 (4) end.
+  sk =. 1 {:: rc   NB. front-end socket number
+  NB. Main loop: read from frontend, INCR to the server, process the response
+if. 0 do.
+  while. do.
+    sockpoll qbm;sk;tourn;password
+  end.
+  NB. connection lost, close socket and rewait
+  sdclose_jsocket_ sk
+else.
+  NB. debug version using timer
+  timerpms =: qbm;sk;tourn;password
+  wd 'timer 50'
+end.
+return.  NB. scaf
+end.
+)
+
+sys_timer  =: 3 : 0
+try. rc =. sockpoll timerpms
+if. rc do.  NB. scaf
+  sdclose_jsocket_ 1{::timerpms  NB. close fe socket before we rewait
+  smoutput 'Error ' , (":rc) , ' on sockets'
+  wd 'timer 0'
+  sockloop lsk;2 3 { timerpms  NB. retry
+end.
+catch.
+wd 'timer 0'
+smoutput 'error in timer'
+smoutput (<: 13!:11'') {:: 9!:8''
+smoutput 13!:12''
+end.
+i. 0 0
+)
+sys_timer_z_ =: sys_timer_base_
+
+NB. y is text to add, x is suffix (<br> if monad)
+addtolog =: 3 : 0
+'<br>' addtolog y
+:
+Glogtext =: Glogtext , y , x
+''
+)
+
+gblifnames =: ;:'Gstate Gscore Gdqlist Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin Gturnwordlist Gbuttonblink Gturnblink'
+
+NB. Initial settings for globals shared with FE
+initstate =: 3 : 0
+Gstate =: GSWORDS
+Gscore =: 0 0
+Gactor =: ''
+Gscorer =: ''
+Gteamup =: 0
+Gteams =: ,<0$a:
+Gwordqueue =: 0 2$a:  NB. table of word ; dqlist
+Gwordundook =: 0
+Gtimedisp =: 0
+Groundno =: _1
+Groundtimes =: 60 60 60
+Gawaystatus =: (<0$a:) , (<0$a:)  NB.  list ; list   status1 status2
+Gwordstatus =: 0 2$a:  NB. Table of name; liast of boxed words
+Glogtext =: ''
+Glogin =: ''
+inithwmk =: 0
+ourloginname =: ''
+rejcmd =: ''  NB. set to a LOGINREJ cmd if we need one
+Ggbls =: 0:"0 gblifnames  NB. Init old copy = something that never matches a boxed value
+Gdqlist =. 0 3$a:
+Gturnwordlist =: 0 3$a:
+Gbuttonblink =: ''
+Gturnblink =: 0
+NB.?lintsaveglobals
+)
+initstate''
+
+NB. Look at commands; handle HELLO, LOGIN, DEAL, TICK
+NB. Result is any text to send to the server
+presync =: 3 : 0&.>
+cmd =. (y i. ' ') {. y
+if. (<cmd) e. 'HELLO';'LOGIN';'DEAL';'' do. ('presyh',cmd)~ (>:#cmd)}.y  NB. y here is the uninterpreted part after the command
+else. y , CRLF
+end.
+)
+
+presyhHELLO =: 3 : 0
+initstate''
+if. 1 = 0 ". y do. incrhwmk =: _1 end.  NB. if parm 1, reset the game state to empty
+''  NB. Nothing to send - functions as a tick
+)
+
+NB. y is the player logging in
+presyhLOGIN =: 3 : 0
+name =. ".y  NB. y has not been interpreted
+login =. ''
+NB. Empty name is Logout, ignore it
+if. #name do.
+  NB. If the game has started, the name must be on a team
+  if. (Gstate e. GSHELLO,GSLOGINOK,GSAUTH,GSWORDS) +. ((<name) e. ; Gteams) do.
+    ourloginname =: name   NB. Remember who we're logging in...
+    ourlogintime =: 0   NB. wait for LOGINREQ
+    login =. 'LOGINREQ ' , y , CRLF   NB. start the login sequence
+    Glogin =: '*'  NB. Indicate login pending
+  end.
+else. Glogin =: ''  NB. not logged in now!
+end.
+
+NB.?lintsaveglobals
 login
 )
 
-
-
-
-FORMBON =: 0 : 0
-pc formbon escclose closeok;pn "Bag Of Nouns";
-menupop Teams;
-menu fmteamshow "Show teams";
-menupopz;
-menupop Away;
-menu fmawaybrb "Be right back";
-menu fmawaygone "Continue without me";
-menupopz;
-menupop Timer;
-menu fmtimerp5 "Add 5 seconds";
-menu fmtimerp15 "Add 15 seconds";
-menusep;
-menu fmtimerm5 "Remove 5 seconds";
-menu fmtimerm15 "Remove 15 seconds";
-menupopz;
-menupop Manage;
-menu fmteamdeal "Deal random teams";
-menusep;
-menu fmstart "Start playing";
-menusep;
-menupop "Time for taboo...";
-menu fmtaboo60 "60 seconds";
-menu fmtaboo90 "90 seconds";
-menu fmtaboo120 "120 seconds";
-menupopz;
-menupop "Time for charades...";
-menu fmcharades60 "60 seconds";
-menu fmcharades90 "90 seconds";
-menu fmcharades120 "120 seconds";
-menupopz;
-menupop "Time for password...";
-menu fmpassword60 "60 seconds";
-menu fmpassword90 "90 seconds";
-menu fmpassword120 "120 seconds";
-menupopz;
-menupopz;
-bin g;
-grid shape 1 2;
-grid colwidth 0 50; grid colwidth 1 20;
-grid colstretch 0 5; grid colstretch 1 1;
- rem left side: the display;
- bin g;
- grid shape 6 1;
- grid rowheight 0 30; grid rowheight 1 10; grid rowheight 2 200; grid rowheight 3 40; grid rowheight 4 40; grid rowheight 5 30;
- grid rowstretch 0 2; grid rowstretch 1 1; grid rowstretch 2 4; grid rowstretch 3 2; grid rowstretch 3 2; grid rowstretch 5 2;
-  rem top row: scores & login;
-  bin h;
-   bin h;
-    bin s1;cc fmscoreadj0 edit center;set fmscoreadj0 inputmask #d;set fmscoreadj0 wh 20 20;bin s1;
-    cc fmscore0 static center;set fmscore0 minwh 20 20;set fmscore0 sizepolicy expanding;set fmscore0 font "Courier New" 64 bold;
-   bin z;
-   bin s;
-   bin v;
-     cc fmslowconn static center;set fmslowconn minwh 80 30;set fmslowconn sizepolicy expanding fixed;set fmslowconn font "Courier New" 24 bold;
-     cc fmlogin combobox;set fmlogin minwh 80 20;;set fmlogin sizepolicy expanding fixed;
-     cc fmloggedin static center;set fmloggedin minwh 80 30;set fmloggedin sizepolicy expanding fixed;set fmloggedin font "Courier New" 10;
-   bin z;
-   bin s;
-   bin h;
-    cc fmscore1 static center;set fmscore1 minwh 20 20;set fmscore1 sizepolicy expanding;set fmscore1 font "Courier New" 64 bold;
-    bin s1;cc fmscoreadj1 edit center;set fmscoreadj1 inputmask #d;set fmscoreadj1 wh 20 20;bin s1;
-   bin z;
-  bin z;
-  rem row 2: progress bar;
-  cc fmprogress progressbar 0 60 60;set fmprogress minwh 50 10;set fmprogress sizepolicy ignored fixed;
-  rem row 3: general display;
-  cc fmgeneral edith;set fmgeneral edit 0;set fmgeneral sizepolicy expanding;set fmgeneral font "Courier New" 32 bold;
-  rem row 4: move to the next word;
-  bin h;
-   cc fmretire4 button;set fmretire4 sizepolicy expanding;set fmretire4 font "Courier New" 24;set fmretire4 text "Got It Late";
-   bin s;
-   cc fmretire3 button;set fmretire3 sizepolicy expanding;set fmretire3 font "Courier New" 24;set fmretire3 text "Time Expired";
-   bin s;
-   cc fmretire0 button;set fmretire0 sizepolicy expanding;set fmretire0 font "Courier New" 24;set fmretire0 text "Don't Know It"; 
-   bin s;
-   cc fmretire1 button;set fmretire1 sizepolicy expanding;set fmretire1 font "Courier New" 24;set fmretire1 text "Pass";
-   bin s;
-   cc fmretire2 button;set fmretire2 sizepolicy expanding;set fmretire2 font "Courier New" 24;set fmretire2 text "Got It";
-   bin z;
-  rem row 5: general purpose buttons;
-  bin h;
-   cc fmsieze0 button;set fmsieze0 sizepolicy expanding;set fmsieze0 font "Courier New" 24;set fmsieze0 text "";
-  bin s;
-   cc fmsieze1 button;set fmsieze1 sizepolicy expanding;set fmsieze1 font "Courier New" 24;set fmsieze1 text "";
-  bin z;
-  rem row 6: status line;
-  cc fmstatus editm readonly;set fmstatus sizepolicy preferred;set fmstatus font "Courier New" 32 bold;
- bin z;
- rem right side: event log;
- cc fmlog edith;set fmlog wrap;set fmlog sizepolicy expanding;
-bin z;
-pas 0 0;
-)
-cleargame=:0
-formbon_run =: 3 : 0
-sdcleanup_jsocket_''
-conntoback 4000
-
-wd :: 0: 'psel formbon;pclose'
-wd FORMBON
-wd 'set fmretire0 text *Don''t',LF,'Know It'
-wd 'set fmretire2 text *Got',LF,'It'
-wd 'set fmretire4 text *Got',LF,'It',LF,'Late'
-wd 'set fmretire3 text *Time',LF,'Expired'
-wd 'pshow'
-
-NB. Start a heartbeat
-nextheartbeat =: 6!:1''
-wd 'ptimer 50'
-''
+presyhDEAL =: 3 : 0
+if. #Gteams do.
+  draw =. (({~ ,&< ({~ <@<@<)) ((<.@-:@#) ? #)) ; Gteams
+  'TEAMS ' , (5!:5<'draw') , CRLF
+else. ''
+end.
 )
 
-formbon_close =: 3 : 0
-wd 'ptimer 0;pclose'
-)
-formbon_cancel =: formbon_close
-
-NB. Here when the background died.  We will keep trying to connect.  Clear the socket to indicate no connection  y is message ID to form, empty to suppress msg
-backdied =: 3 : 0
-if. sk do.
-  sdclose_jsocket_ sk
-  sk =: 0
-  if. #y do. wd 'psel formbon;set fmslowconn text *Comm to background failed (',(":y),').' end.
+presyh =: 3 : 0  NB. tick
+NB. If we are the actor, change the tick to a TICK
+res =. rejcmd
+rejcmd =: ''  NB. It's a one-shot
+if. (Glogin -: Gactor) do.
+  if. (Gstate = GSACTING) *. (Gtimedisp>0) do. res =. res , 'TICK 0',CRLF end.
 end.
-''
-)
-
-NB. Try to establish connection to bg.  Return 0 if successful, and set sk.  y is connto in msec
-conntoback =: 3 : 0
-NB. Connect to the background
-sk =: 1 {:: sdsocket_jsocket_ ''
-thismachine =: sdgethostbyname_jsocket_ 'localhost'
-NB. sdioctl_jsocket_ sk , FIONBIO_jsocket_ , 1  NB. Make socket non-blocking
-rc =. sdconnect_jsocket_ sk;(}.thismachine),<8090  NB. start connecting
-if. sk e. 2 {:: sdselect_jsocket_ '';sk;'';y do.
-  NB. Start with a message to say we arrived.  The response must set all our globals
-  Gstate =: GSHELLO  NB. initial state to help ignoring one-shots
-  backcmd 'HELLO ',":cleargame
-  cleargame=:0  NB. Don't do it again accidentally
-  0
-else.
-  backdied 0  NB. Indicate no connection
-  1
-end.
-
+if. #ourloginname do. if. (ourlogintime~:0) *. (6!:1'')>ourlogintime+4 do.
+  Glogin=:ourloginname
+  ourloginname =: ''
+  ourlogintime =: 0
+end. end.
+res
 )
 
-heartbeatrcvtime =: _  NB. time previous heartbeat was received
-formbon_timer =: 3 : 0
-try.
-if. sk=0 do.
-  NB. No bg connection yet, or connection lost - establish one
-  if. conntoback 4000 do.
-    smoutput 'cannot connect to background, retrying'
-  end.
-end.
-if. sk do.
-  if. nextheartbeat < 6!:1'' do.
-    backcmd ''   NB. Send heartbeat msg every second
-    nextheartbeat =: nextheartbeat + 1.   NB. schedule next heartbeat
-  end.
-  if. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.
-    cmdqueue =. 0$a:   NB. list of commands in this batch
-    hdr =. ''   NB. No data, no bytes of header
-    while. do.   NB. Read all the commands that are queued
-      NB. There is data to read.  Read it all, until we have the complete message.  First 4 bytes are the length
-      while. 4>#hdr do.
-        'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
-        if. (rc~:0) +. (0=#data) do. backdied 1 return. end.
-        hdr =. hdr , data
-        if. 4=#hdr do. break. end.
-        if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';4000 do. backdied 2 return. end.
-      end.
-      hlen =. _2 (3!:4) hdr   NB. Number of bytes to read
-      if. 0=hlen do. break. end.  NB. 0-length message is a heartbeat, skip it
-smoutput'data from BE '  NB. scaf
-      readdata =. ''
-      while. do.
-        'rc data' =. sdrecv_jsocket_ sk,(4+hlen),00   NB. Read the data
-        if. (rc~:0) +. (0=#data) do. backdied 3 return. end.
-        hlen =. hlen-#data  NB. decr count left
-        if. hlen <: 0 do. cmdqueue =. cmdqueue , < readdata , hlen }. data break. end.
-        readdata =. readdata , data
-        if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';4000 do. backdied 4 return. end.
-      end.
-      if. hlen=0 do. break. end.
-      hdr =. hlen {. data
-    end.
-    wd 'psel formbon'
-    heartbeatrcvtime =: 6!:1''  NB. Indicate when we received a heartbeat
-    if. #cmdqueue do. proccmds cmdqueue end.  NB. Ignore empty heartbeat
-  end.
-  NB. See if the connection is slow
-  if. 2 < responsetime =. (6!:1'') - heartbeatrcvtime do.
-    wd 'psel formbon;set fmslowconn text *Slow connection' , (responsetime>4.) # ' ' , (, ':'&,)&(_2&({.!.'0')@":)/ 60 60 #: <. responsetime
-  else. wd 'psel formbon;set fmslowconn text ""'  NB. Clear message if OK
-  end.
-end.
-catch.
-  wd'psel formbon;ptimer 0'
-  nextheartbeat =: _
-  smoutput'error in timer handler'
-  smoutput (<: 13!:11'') {:: 9!:8''
-  smoutput 13!:12''
-  backdied''   NB. Wait for restart
-end.
+NB. y is sequence or CRLF-delimited commands from the server.  We process them one by one,
+NB. making changes to the globals as we go.  Then, we send the changed globals to the FE.
+postsync =: 3 : 0
+". :: (addtolog@('Failed: '&,)) @('postyh'&,);._2 y -. CR   NB. run em all
+NB. Send the changed names
 i. 0 0
 )
 
-NB. Send the command in y, prefixed by length
-backcmd =: 3 : 0
-if. #y do. smoutput 'backcmd: ' , y end. NB. scaf
-NB. Skip this is background is dead
-if. sk do.
-  senddata =. (2 (3!:4) #y) , y   NB. prefix the data with 4-byte length
-  while. #senddata do.
-    if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';1000 do. backdied 5 return. end.
-    rc =. senddata sdsend_jsocket_ sk,0
-    if. 0~:0{::rc do. backdied 6 return. end.
-    senddata =. (1 {:: rc) }. senddata
+postyhLOGINREQ =: 3 : 0
+NB. If this the first request for our pending login, start our timer.
+if. y -: ourloginname do.
+  if. ourlogintime=0 do.
+    ourlogintime =: 6!:1''
+  else. rejcmd =: 'LOGINREJ ' , (5!:5<'y') , CRLF
   end.
+NB. If this is a request for our current login, or a later request for our pending login, reject it
+elseif. y -: Glogin do. rejcmd =: 'LOGINREJ ' , (5!:5<'y') , CRLF
+end.
+NB. If the game hasn't started, and this is the first time we've seen this name, remember it
+NB. If teams have been drawn, invalidate them
+if. Gstate=GSWORDS do. if. (<y) -.@e. ; Gteams do. Gteams =: < (<y) , ; Gteams end. end.
+''
+)
+
+postyhLOGINREJ =: 3 : 0
+if. y -: ourloginname do.  NB. Abort pending login if rejected anywhere (including here)
+  ourloginname =: ''
+  ourlogintime =: 0
+  Glogin =: ''  NB. remove login-pending status
 end.
 ''
 )
 
-NB. Order of processing state info
-statepri =: (;: 'Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordundook Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
-NB. Process the command queue, which is a list of boxes.  Each box contains
-NB. the 5!:5 of a table of state information, as
-NB. infotype ; value
-NB. We convert the values to internal form and assign them to the names Ginfotype; then
-NB. we drive handlers for all the changed values.  We visit the handlers in a priority order.
-NB. We collect all the changed values for all commands before we drive any of the handlers
-NB. y cannot be empty
-proccmds =: 3 : 0
-qprintf'y '
-initing =. Gstate=GSHELLO  NB. set if this is the very first call
-NB. Turn each input into a boxed table of name ; value
-NB. Run the tables together, keep the latest of each
-cmds =. ((~.@[ ,. ({:/. {:"1))~ {."1) ; ".&.> y
-NB. Assign values to names
-({."1 cmds) =: {:"1 cmds
-if. initing do. Gbuttonblink =: '' [ Gturnblink =: 0 end.  NB. turn off one-shots, which are sticky, if in initial state
-
-NB. Start with the lowest modified state, and then all handlers till the end.  May be none
-wd 'psel formbon'
-for_h. statepri (<./@:i. }. [) {."1 cmds do. ('hand',>h)~ '' end.
-''
-)
-NB. The handlers, in priority order.  They all return empty
-handGlogin =: 3 : 0
-loggedin =: 3 < #Glogin
-if. Glogin -: '*' do.
-  wd 'set fmloggedin text *Login in progress...'
-elseif. loggedin do.
-  wd 'set fmloggedin text *' , Glogin , ' is logged in here'
-else.
-  wd 'set fmloggedin text *Login by selecting or entering your name'
-end.
-''
-)
-
-handGroundtimes =: 3 : 0
-(3 # 'taboo';'charades';'password') ([: wd 'set fm' , >@[ , ":@{.@] , ' checked ' , ":@{:@])"_1 ,/ Groundtimes (]"0/ ,"0 =/) 60 90 120
-''
-)
-
-handGturnblink =: 3 : 0
-if. Gturnblink do.
-  NB. Play an attention-getting animation
-  for_color. '0123456789ABCDEF' {~ 20 6 ?@$ 16 do.
-    fsize =. 192 + ? 64
-    wlen =. 4 + ?5
-    wchars =. 'RING' [^:(?2) wlen ((?@$ #) { ]) '!@#$%^&*()AgdrwTGdfsvDFHJYTSIGFTBSDL'
-    wd 'set fmgeneral font "Courier New" ' , (":fsize) , ' bold;set fmgeneral text *<font color=#' , color , '>',wchars,'</font>'
-    wd 'msgs'
-    6!:3 (0.06)
-  end.
-  wd 'set fmgeneral font "Courier New" 32 bold'  NB. Reset for normal use
-  Gturnblink =: 0  NB. It shouldn't come twice, but take no chances
-end.
-''
-)
-
-handGdqlist =: 3 : 0
-''
-)
-
-Gteamnames =: 'Red';'Black'
-
-NB. Button-enable based on state
-NB. rows are buttons, columns are state. c1 is always 1, l1 only if logged in
-NB.             HELLO LOGINOK AUTH WORDS WACTOR WSCORER WSTART ACTING PAUSE SETTLE CONFIRM CHANGE CHANGEWACTOR CHANGEWSCORER CHANGEWSTART GAMEOVER
-statetoenable =: ;:;._2 (0 : 0)
-fmteamshow       l0     l0     l0   l1     l1     l1      l1     l1    l1     l1     l1     l1      l1             l1             l1         c0
-fmawaybrb        l0     l0     l0   l1     l1     l1      l1     l1    l1     l1     l1     l1      l1             l1             l1         c0
-fmawaygone       l0     l0     l0   l1     l1     l1      l1     l1    l1     l1     l1     l1      l1             l1             l1         c0
-fmtimerp5        l0     l0     l0   l0     l0     l0      l0     l1    l1     l1     l0     l0      l0             l0             l0         c0
-fmtimerp15       l0     l0     l0   l0     l0     l0      l0     l1    l1     l1     l0     l0      l0             l0             l0         c0
-fmtimerm5        l0     l0     l0   l0     l0     l0      l0     l1    l1     l1     l0     l0      l0             l0             l0         c0
-fmtimerm15       l0     l0     l0   l0     l0     l0      l0     l1    l1     l1     l0     l0      l0             l0             l0         c0
-fmteamdeal       l0     l0     l0   l1     l0     l0      l0     l0    l0     l0     l0     l0      l0             l0             l0         c0
-fmcharades60     l0     l0     l0   l1     l0     l0      l0     l0    l0     l0     l0     l0      l0             l0             l0         c0
-fmcharades90     l0     l0     l0   l1     l0     l0      l0     l0    l0     l0     l0     l0      l0             l0             l0         c0
-fmscoreadj0      l0     l0     l0   l0     l0     l0      l0     l0    l0     l1     l1     l0      l0             l0             l0         c0
-fmlogin          c0     l1     l1   c1     c1      a       as     as    as     as    as     as      as              a              a         c0
-fmscoreadj1      l0     l0     l0   l0     l0     l0      l0     l0    l0     l1     l1     l0      l0             l0             l0         c0
-fmretire0        l0     l0     l0   l0     l0     l0      l0      S     S      A     l0     l0      l0             l0             l0         c0
-fmretire1        l0     l0     l0   l0     l0     l0      l0      S     S      A     l0     l0      l0             l0             l0         c0
-fmretire2        l0     l0     l0   l0     l0     l0      l0      S     S      A     l0     l0      l0             l0             l0         c0
-fmsieze0         l0     l0     l0   l1      T     A       S     l1     S      A      A      A       A              A               S         c0
-fmsieze1         l0     l0     l0   l0      T     l1      AS     Sw    Sw     Aw     Aw     l0      A              l1             AS         c0
-)
-
-handGstate =: 3 : 0
-NB. Set conditional enables
-'c0 c1 l0 l1' =. ":"0 , (1,loggedin) *./ 0 1
-'a s as A S AS' =. ":"0 (3 # 1,loggedin) *. (Glogin -: Gactor) (-.@[ , -.@] , +: , [ , ] , +.) (Glogin -: Gscorer)
-T =. ":"0 (<Glogin) e. Gteamup {:: Gteams
-NB. Select the column; get mask to discard 'Sw', which we do later
-EM   =: enmsk =. ('Sw';'Aw') -.@:e.~ EV   =: envals =. (>:Gstate) {"1 statetoenable
-NB. Set all the enables
-({."1 statetoenable) ([: wd 'set ',[,' enable ',".@])&>&(enmsk&#) envals
-NB. Set display for the variable buttons
-wd 'set fmsieze0 text *' , (1;((0{::buttoncaptions0) i. Gstate)) {:: buttoncaptions0
-wd 'set fmsieze1 text *' , (1;((0{::buttoncaptions1) i. Gstate)) {:: buttoncaptions1
-if. Gstate -.@e. GSSETTLE,GSCONFIRM do. wd 'set fmscoreadj0 text "";set fmscoreadj1 text ""' end.
-NB. Display the status line; if the general line is known from the state, do it too
-select. Gstate
-case. GSHELLO do. text =. 'Catching up'
-case. GSLOGINOK do. text =. 'OK to login'
-case. GSAUTH do. text =. 'Waiting for authorization'
-case. GSWORDS do. text =. 'Players are entering words'
-case. GSWACTOR do.
-  wd 'set fmgeneral text *Next up: ' , ((Gteamup;0) {:: Gteams) , ' then ' , ((Gteamup;1) {:: Gteams)
-  text =. 'Need player for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
-case. GSWSCORER do. text =. 'Need someone to score for ' , Gactor
-case. GSWSTART do.
-  wd 'set fmgeneral text *' , (Glogin-:Gscorer) # 'You may fire when you are ready, Gridley.'
-  text =. Gscorer , ', start the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
-case. GSACTING do. text =. Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password') , ' and ' , ((Gactor -.@-: Gscorer) # Gscorer , ' is ') , 'scoring'
-case. GSPAUSE do. text =. 'Clock stopped - ' , Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password')
-case. GSSETTLE do. text =. Gactor , ' is finalizing scores'
-case. GSCONFIRM do.
-  text =. ((*Gtimedisp) {:: 'End of turn';'Round change') , '.  Note words, check score'
-case. GSCHANGE do.
-  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Round change!  Next round: ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
-  text =. 'Changing to ' , Groundno {:: 'Taboo';'Charades';'Password';'Scotch'
-case. GSCHANGEWACTOR do.
-  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Do you want a scorer for the ',(Groundno {:: 'Taboo';'Charades';'Password'),' round?'
-  text =. 'Does ' , Gactor , ' need a scorer for ',(Groundno {:: 'Taboo';'Charades';'Password'),'?' 
-case. GSCHANGEWSCORER do. text =. 'Need someone to score for ' , Gactor
-case. GSCHANGEWSTART do.
-  wd 'set fmgeneral text *' , (Glogin-:Gscorer) # 'You may fire when you are ready, Gridley.'
-  text =. Gscorer , ', start the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
-case. GSGAMEOVER do. text =. 'Game Over'
-case. do. text =. ''
-end.
-
-wd 'set fmstatus text *', text
-''
-)
-buttoncaptions0 =: (<@;)`(<@(,&a:))`(<@(,&a:))"1 ".&.> |: ;:@(LF&(('*'&(I.@:=)@])}));._2 (0 : 0)
-GSWORDS 'Enter Words*From Clipboard' 'W'
-GSWACTOR 'I will play*and score' 'ACTOR '';1;0'
-GSWSCORER 'Undo!  I don''t*want to play'    'ACTOR '';0;0'
-GSWSTART 'Start the clock'  'ACT 0'
-GSACTING 'Stop the clock'  'TIMERADJ 0;0;'''
-GSPAUSE 'Start the clock'  'TIMERADJ 1;0;'''
-GSSETTLE 'See all*the words'   'S'
-GSCONFIRM 'Everybody*agrees*score'   'COMMIT 0'
-GSCHANGE 'Yes, proceed' 'PROCEED 0'
-GSCHANGEWACTOR 'I don''t need*a scorer'   'ACTOR '';1;0'
-GSCHANGEWSCORER ''    ''
-GSCHANGEWSTART 'Start the clock'  'ACT 0'
-)
-buttoncaptions1 =: (<@;)`(<@(,&a:))`(<@(,&a:))"1 ".&.> |: ;:@(LF&(('*'&(I.@:=)@])}));._2 (0 : 0)
-GSWACTOR 'I will play*but I need*a scorer' 'ACTOR '';1;1'
-GSWSCORER 'I will score'  'SCORER '';1'
-GSWSTART 'Undo'  'SCORER '';0'
-GSACTING 'Undo last score' 'PREVWORD 0'
-GSPAUSE 'Undo last score'  'PREVWORD 0'
-GSSETTLE 'Undo last score'  'PREVWORD 0'
-GSCONFIRM 'See all*the words'   'S'
-GSCHANGE '' ''
-GSCHANGEWACTOR 'I need*a scorer'   'ACTOR '';1;1'
-GSCHANGEWSCORER 'I will score'  'SCORER '';1'
-GSCHANGEWSTART 'Undo!  I don''t*want to score'  'SCORER '';0'
-)
-
-handGteams =: 3 : 0
-wd 'set fmlogin items' , ;@:((' "' , ,&'"')&.>) (<'Logout'),~^:loggedin (/: tolower&.>) ; Gteams
-wd 'set fmlogin select ' , ": >: # ; Gteams  NB. Make selection blank
-wd 'set fmstart enable ' , ": loggedin *. (Gstate=GSWORDS) *. (2=#Gteams)
-''
-)
-
-handGroundno =: 3 : 0
-wd 'set fmprogress min 0;set fmprogress max *',": (1 >. #;Gteams) [^:(Gstate=GSWORDS) Groundno { Groundtimes  NB. Set progress limits depending on state
-)
-
-handGactor =: 3 : 0
-''
-)
-
-handGscorer =: 3 : 0
-''
-)
-
-handGteamup =: 3 : 0
-''
-)
-
-handGawaystatus =: 3 : 0
-if. Gstate=GSWSTART do.
-  wd 'set fmgeneral text *' , ; ('BRB: ';'Away: ') (*@#@] # '<br>' ,~ [ , ])&.> Gawaystatus ;:^:_1@-.&.> (-. Gteamup) { Gteams 
-end.
-wd 'set fmawaybrb value ' , ": loggedin *. (<Glogin) e. 0 {:: Gawaystatus
-wd 'set fmawaygone value ' , ": loggedin *. (<Glogin) e. 1 {:: Gawaystatus
-''
-)
-
-handGwordstatus =: 3 : 0
+NB. y is 2 boxes of names
+postyhTEAMS =: 3 : 0
+NB. Accept the teams if they embrace all players and we haven't started, otherwise discard.  There must be at least 4 players, and no multiple assignments
 if. Gstate=GSWORDS do.
-  wd 'set fmprogress value *',": #Gwordstatus
-  if. 0=#;Gteams do. wd 'set fmgeneral text *Waiting for first login'
-  elseif. #missing =. (;Gteams) -. {."1 Gwordstatus do.
-    wd 'set fmgeneral text *Players who have not entered words:<br>' , ;:^:_1 missing
-  else. wd 'set fmgeneral text *All players have entered words'
-  end.
-end.
-''
-)
-
-handGlogtext =: 3 : 0
-wd 'set fmlog text *',Glogtext
-''
-)
-
-handGturnwordlist =: 3 : 0
-if. Gstate = GSCONFIRM do.   NB. display words in CONFIRM state, where they might be changed by a SCOREMOD without changing state
-  NB. Extract the words that are being retired
-  rwords =. (#~ 1 = (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words.  wordqueue must be empty
-  if. #rwords do.
-    rwords =. <@(1&{:: , ' (late)' #~ 0 = (2;0)&{::)"1 rwords  NB. word text, with late words indicated
-    wd 'set fmgeneral text *' , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'Words: ', _2 }. ; ,&', '&.> rwords
-  else.
-    wd 'set fmgeneral text *' , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'No words were scored.'
-  end.
-end.
-''
-)
-
-
-APSinstructions =: <;._2 (0 : 0)
-<small>Play in order.  Word stays red until scored:</small><ul>
-Clock is stopped - wait<ul>
-<small>Words left over.  Handle the word in red (usually Time Expired), or use big buttons to review scores.</small><ul>
-)
-handGwordqueue =: 3 : 0
-if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
-  if. Glogin -: Gactor do.
-    NB. Special display for the actor.  Prefix it with instructions
-    text =. ((GSACTING,GSPAUSE,GSSETTLE) i. Gstate) { APSinstructions
-    if. #Gwordqueue do.
-      NB. Show the queue, with an indication of how the words were scored, if they were
-      words =. 1 {"1 Gwordqueue
-      scoretag =. ((0 _1;_1 0;1 1;0 0;0 1) i. 2 {"1 Gwordqueue) { ' (didn''t know it)';' (passed -1)';' (scored +1)';' (time expired)';' (guessed late)';''
-      if. *@#words do. words =. (('<font color=red>' , ,&'</font>')&.> {. words) 0} words end.
-      text =. text , <@('<li>' , ;)"1 words,.scoretag
-    else.
-      NB. No words should be possible only in CONFIRM state
+  if. (0=# (;Gteams) -.;y) *. (0=# (;y) -.;Gteams) do.
+    if. 4 <: #;y do.
+      Gteams =: y
     end.
-    wd 'set fmgeneral text *' , ; text
-  else.
-    NB. For non-actors, indicate DQ status for the word, if there is still time
-    if. Gstate e. GSACTING,GSPAUSE do.
-      if. #Gwordqueue do.
-        NB. See who is DQd from the acting team
-        dqplrs =. (((<0;0 1) { Gwordqueue) -:"1 (2 {."1 Gdqlist)) # 2 {"1 Gdqlist 
-        text =. 'DQ: '&,^:(*@#) ;:^:_1 dqplrs -. ((-. Gteamup) {:: Gteams) , <Gactor 
-      else. text =. ''
+  end.
+end.
+''
+)
+
+NB. name ; 5!:5 'words' - audited in the FE
+postyhWORDS =: 3 : 0
+'name words' =. y
+NB. Accept it if we haven't started
+if. Gstate=GSWORDS do.
+  otherwords =. (<name) (] #~ (~: {."1)) Gwordstatus
+  NB. Remove matches for the word.  Could do plurals, Leveshtein, etc here
+  words =. words -. ; 1 {"1 otherwords
+  Gwordstatus =: (name;<words) ,~ otherwords
+end.
+''
+)
+
+NB. rnd nsec
+postyhRDTIME =: 3 : 0
+'rd sec' =. y
+NB. Accept at any time
+Groundtimes =: sec rd} Groundtimes
+''
+)
+
+NB. name [012]
+postyhAWAYSTATUS =: 3 : 0
+'name status' =. y
+name =. <name
+NB. Accept at any time.  Filtering is done by FE
+Gawaystatus =: ((status = 1 2) <@# name) ,&.> -.&name&.> Gawaystatus
+''
+)
+
+NB. name - start the game phase
+postyhSTART =: 3 : 0
+NB. Ignore if game is underway or teams have not been assigned
+if. (Gstate=GSWORDS) *. 2=#Gteams do.
+NB.?lintonly Gteams =: (;:'Bob Carol'),&<(;:'Ted Alice')
+  NB. Reset game, move to playing state
+  Gteamup =: 0 [ actorhist =: 0 2$a:
+  NB. Init the wordlist and history from prev round
+  NB. wordbag is list of round;word where each round's words are put in pseudorandom order by CRC, but kept in group by round
+  words =. /:~~ ; 1 {"1 Gwordstatus   NB. All the words, in order
+  wordbag =: ,/ 0 1 2 ([ ;"0 ;@:(<@(] /: (128!:3@,&> {&(;:'aV76 Gr83l H2df968'))~)))"0 _ words
+NB.?lintonly wordbag =: ,: 1;'word'
+  NB. exposedwords is the priority list that we must finish before going into the wordbag.  It is
+  NB. round;word;score (where score of 0 0 means don't know)
+  exposedwords =: 0 3$a:
+NB.?lintonly exposedwords =: ,: 1;'word';1 1
+  NB. Gdqlist is a list of round;word;name for every time a word is added to the exposedwords
+  Gdqlist =: 0 3$a:
+NB.?lintonly dqlist =: ,: 1;'word';'name'
+  NB. Gwordqueue is a list of round;word;dqlist where each word is in Groundno.  These words are exposed to the actor
+  Gwordqueue =: 0 3$a:
+NB. Gwordqueue =: ,: '1';'word';< ,<'dq'
+  Groundno =: 0
+  Gstate=:GSWACTOR
+  Gtimedisp =: 0
+NB.?lintsaveglobals
+''
+end.
+)
+
+NB. name do/undo  needscorer
+postyhACTOR =: 3 : 0
+NB. Accept if in WACTOR (if type=1) or WSCORER (do=0 and name matches Gactor) or CHANGEWACTOR (if do=1 and name matches Gactor)
+'name do needscorer' =. y
+if. do = (1 ,((name-:Gactor) { 2 2,:0 1),2) {~ (GSWACTOR,GSWSCORER,GSCHANGEWACTOR) i. Gstate do.
+  if. do do.
+    NB. We are accepting a name.  Save it and move to WSCORER or WSTART
+    if. Gstate=GSCHANGEWACTOR do.
+      Gstate =: needscorer { GSCHANGEWSTART,GSCHANGEWSCORER 
+    else.
+      Gactor =: name
+      NB. If we changing rounds, interpolate CHANGE state
+      if. Groundno ~: nextroundno'' do.
+        Groundno =: nextroundno''
+        Gstate =: GSCHANGE
+      else. Gstate =: needscorer { GSWSTART,GSWSCORER
       end.
-      wd 'set fmgeneral text *' , text
-    else.
-      wd 'set fmgeneral text *' , (*Gtimedisp) {:: 'Turn is over';'Scoring break, turn will continue'
+    end.
+    Gscorer =: needscorer {:: name;''
+  elseif. Gstate e. GSWSTART,GSWSCORER do.
+    NB. We are taking an undo, necessarily from START/SCORER to ACTOR.  Forget the actor's name, and the scorer's
+    Gactor =: Gscorer =: ''
+    Gstate =: GSWACTOR
+  end.
+end.
+''
+)
+
+SCORERstates =: ".;._2 (0 : 0)
+GSWSCORER , 1 0 0
+GSWSCORER , 1 0 1
+GSWSCORER , 1 1 0
+GSWSCORER , 1 1 1
+GSCHANGEWSCORER , 1 0 0
+GSCHANGEWSCORER , 1 0 1
+GSCHANGEWSCORER , 1 1 0
+GSCHANGEWSCORER , 1 1 1
+GSWSTART , 0 0 1
+GSWSTART , 0 1 0
+GSWSTART , 0 1 1
+GSCHANGEWSTART , 0 0 1
+GSCHANGEWSTART , 0 1 1
+)
+NB. name do/undo
+postyhSCORER =: 3 : 0
+NB. Accept if:
+NB.  do in WSCORER or CHANGEWSCORER
+NB.  undo in WSTART if actor or scorer
+NB.  undo in CHANGEWSTART if scorer
+'name do' =. y
+if. (Gstate , do , (name-:Gactor) , (name-:Gscorer)) e. SCORERstates do.
+  if. do do.
+    Gscorer =: name
+    Gstate =: (Gstate=GSWSCORER) { GSCHANGEWSTART,GSWSTART
+  else.
+    NB. It's an undo
+    Gscorer =: ''
+    Gstate =: (Gstate=GSWSTART) { GSCHANGEWSCORER,GSWSCORER
+    if. (name-:Gactor) *. (Gstate=GSWSCORER) do.   NB. If actor quails, go back to WACTOR - not if CHANGE
+      Gactor =: ''
+      Gstate =: GSWACTOR
     end.
   end.
 end.
 ''
 )
 
-handGwordundook =: 3 : 0
-if. Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM do.
-  en =. Gwordundook *. ((Gstate e. GSACTING,GSPAUSE) *. Glogin-:Gscorer) +. ((Gstate e. GSSETTLE,GSCONFIRM) *. Glogin-:Gactor)
-  wd 'set fmsieze1 enable ',":loggedin*.en
+NB. nilad
+postyhACT =: 3 : 0
+NB. Accept in WSTART or CHANGEWSTART
+if. Gstate e. GSWSTART,GSCHANGEWSTART do.
+  NB. go ACTING state.  If we were in START, start the timer.  This starts the turn.
+  if. Gstate = GSWSTART do.
+    Gtimedisp =: Groundno { Groundtimes
+    NB. Gturnwordlist is the list of round;word;score for words that have been moved off the wordqueue.  Taken together, turnwordhist and Gwordqueue
+    NB. have all the words that were exposed this turn
+    Gturnwordlist =: 0 3$a:
+    NB.?lintonly Gturnwordlist =: ,: 1;'word';1 1
+    NB. We save a copy of the exposedwords before we start so that we can delete words dismissed twice in a row
+    prevexposedwords =: exposedwords
+    NB. Save the score for computing the player's total
+    prevscore =: Gscore
+    NB. Move the acting player to the bottom of the priority list
+    Gteams =: (< (Gteamup {:: Gteams) (-. , ]) <Gactor) Gteamup} Gteams
+    NB.?lintonly prevexposedwords =: ,: 1;'word';1 1
+    NB.?lintsaveglobals
+  end.
+  Gstate =: GSACTING
+  getnextword''   NB. Prime the pipe
 end.
 ''
 )
 
-handGbuttonblink =: 3 : 0
-NB. Turn off the blink in all states, to make sure it isn't left on
-if. Gbuttonblink -: '' do.
-  wd , 'p<set fmretire>q< font "Courier New" 24;>'  (8!:2) i. 5
-elseif. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) *. Glogin -.@-: Gscorer do.
-  NB. Blink only in word-scoring states, and not on the scorer's screen to avoid distraction
-  wd  'p<set fmretire>q< font "Courier New" 32 bold;>' (8!:2) (5 2 $0 _1  _1 0  1 1  0 0  0 1) i. Gbuttonblink
+NB. Add words to the word queue until it's full.  It holds 2 words
+NB. We always take from the exposedwords if there is one.  Otherwise we draw from the bag.
+NB. BUT: we never draw a word if it is a different round from the word on the stack
+getnextword =: 3 : 0
+while. 2 > #Gwordqueue do.
+  nextrdwd =. ''  NB. Indicate no word added
+  NB. If there is a word in the queue, save its round to indicate we must match it; otherwise empty to match anything
+  if. #exposedwords do. if. Groundno = (<0 0) {:: exposedwords do.
+    NB. There is a valid exposed word.  Take it
+    nextrdwd =. (<0;0 1) { exposedwords
+    exposedwords =: }. exposedwords
+  end. elseif. #wordbag do. if. Groundno = (<0 0) {:: wordbag do.
+    NB. There is a valid word in the bag.  Take it
+    nextrdwd =. (<0;0 1) { wordbag
+    wordbag =: }. wordbag
+  end. end.
+  NB. If there is no word to add, exit
+  if. 0=#nextrdwd do. break. end.
+  NB. Expose the word, with no scoring
+  Gwordqueue =: Gwordqueue , nextrdwd , a:
 end.
 ''
 )
 
-handGscore =: 3 : 0
-wd 'set fmscore0 text ',(":0 { Gscore),';set fmscore1 text ',":1 { Gscore
+NB. Return round# of the next word
+nextroundno =: 3 : 0
+if. # Gwordqueue do. (<0 0) {:: Gwordqueue
+elseif. #exposedwords do. (<0 0) {:: exposedwords
+elseif. #wordbag do. (<0 0) {:: wordbag
+else. 3
+end.
+)
+
+NB. Return true if the word queue is empty or the top word is not for our round.  Indicates change of round
+NB. We have just called getnextword to fill the word queue
+isnewround =: 3 : 0
+if. -. *@# Gwordqueue do. 1 return. end.   NB. 1 if no words
+Groundno ~: (<0 0) {:: Gwordqueue   NB. 1 if top word is for different round
+)
+
+NB.  {-1 0 1} {01}   score, count wd as played
+postyhNEXTWORD =: 3 : 0
+'score retire' =. y
+NB. Accept only if there is a word in the word queue, and if we are in a scorable state
+if. (*@# Gwordqueue) *. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
+  NB. Adjust the score
+  Gscore =: (score + Gteamup { Gscore) Gteamup} Gscore
+  NB. Move the word from the wordqueue to the Gturnwordlist
+  Gturnwordlist =: Gturnwordlist , (<score,retire) 2} {. Gwordqueue  NB. put rd/wd/score onto turnlist
+  Gwordqueue =: }. Gwordqueue
+  Gwordundook =: (<Groundno) e. 0 {"1 Gturnwordlist  NB. Allow undo if there's something to bring back
+  NB. If we are still acting or paused, top up the qword queue
+  if. Gstate e. GSACTING,GSPAUSE do. getnextword'' end.
+  NB. If the word queue is still empty, that's a change of state: go to CONFIRM to accept the score and move on.  Keep the time
+  NB.   on the timer
+  if. isnewround'' do. Gstate =: GSCONFIRM end.
+  NB. Blink the pressed button as an ack to the team
+  Gbuttonblink =: score,retire  NB. This gets reset automatically
+end.
 ''
 )
 
-handGtimedisp =: 3 : 0
-if. Gstate e. GSWACTOR,GSWSTART,GSACTING,GSPAUSE,GSSETTLE,GSCHANGE do. wd 'set fmprogress value *',": Gtimedisp end.
-wd 'set fmretire3 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gactor)
-wd 'set fmretire4 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gactor)
+postyhPREVWORD =: 3 : 0
+NB. If there is a word in the turnlist, and  we are acting or paused, or we are settling
+if. Gwordundook *. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) do.
+  NB. Move tail of turnwords to head of Gwordqueue, adding in the dq info
+  tailwd =. {: Gturnwordlist
+  Gwordqueue =: Gwordqueue ,~ tailwd
+  Gturnwordlist =: }: Gturnwordlist
+  Gwordundook =:  (<Groundno) e. 0 {"1 Gturnwordlist  NB. Allow undo if there's something to bring back
+  NB. Undo the score
+  score =. (2;0) {:: tailwd  NB. score entered for the word
+  Gscore =: (score -~ Gteamup { Gscore) Gteamup} Gscore
+  NB. Handle changes of state.
+  NB. If we are ACTING or PAUSED, and the new word is for a different round, go to CHANGE state for that round
+  if. (Gstate e. GSACTING,GSPAUSE) *. Groundno ~: (<0 0) {:: Gwordqueue do.
+    Groundno =: (<0 0) {:: Gwordqueue  NB. set new round before CHANGE
+    Gstate =: GSCHANGE
+  NB. If we are SETTLING or CONFIRM, go into SETTLE until the queue is empty
+  elseif. Gstate = GSCONFIRM do. Gstate =: GSSETTLE
+  end.
+end.
 ''
 )
 
-NB. Display modal dialog and then suppress slow msg
-wdmodal =: 3 : 0
-wd y
-heartbeatrcvtime =: _   NB. Stifle message while this form was displayed
+NB. nilad
+postyhPROCEED =: 3 : 0
+NB. Valid only in CHANGE state.  If the timer is running, go to CHANGEWACTOR, otherwise WSCORER or WSTART
+if. Gstate=GSCHANGE do.
+  Gstate =: (Gtimedisp=0) { GSCHANGEWACTOR,(*@#Gscorer){GSWSCORER,GSWSTART
+end.
+''
 )
 
-NB. Button processors
-LOGINCHARS =: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-formbon_fmlogin_select =: 3 : 0
-if. 'Logout'-:fmlogin do. fmlogin=:''  NB. Convert Logout to empty
-elseif. (Gstate -.@e. GSHELLO,GSLOGINOK,GSAUTH,GSWORDS) *. (<fmlogin) -.@e. ; Gteams do.
-  wdmodal 'mb info mb_ok "Too Late" "The game has started.  Only old logins are allowed"'
-  NB. Because an entry causes Qt to add the name to the list, refresh the list
-  wd 'set fmlogin items' , ;@:((' "' , ,&'"')&.>) (<'Logout'),~^:loggedin (/: tolower&.>) ; Gteams
-  wd 'set fmlogin select ' , ": >: # ; Gteams  NB. Make selection blank
-  i. 0 0 return.
+NB. table of row;new score
+postyhSCOREMOD =: 3 : 0
+NB. Accept only if SETTLE or CONFIRM
+if. Gstate e. GSSETTLE,GSCONFIRM do.
+  edits =. y
+  NB. This operates on the combined wordlist/queue.  Create that here and split again at the end
+  wl =. Gturnwordlist , Gwordqueue
+  NB. Save total score before change
+  sc0 =. +/ {.@(2&{::)"1 wl
+  NB. apply the edits
+  wl =. ({:"1 edits) (<2 ;~ ; {."1 edits)} wl
+  NB. Get total score after change
+  sc1 =. +/ {.@(2&{::)"1 wl
+  NB. Adjust the score
+  Gscore =: ((sc1-sc0) + Gteamup { Gscore) Gteamup} Gscore
+  NB. Split back into two lists, with wordqueue holding unscored words
+  unscored =. a: = 2 {"1 wl
+  Gturnwordlist =: (-. unscored) # wl
+  Gwordqueue =: unscored # wl
+  NB. If the wordqueue is not empty, go to SETTLE, otherwise stay in CONFIRM
+  Gstate =: (*@# Gwordqueue) { GSCONFIRM,GSSETTLE
+end.
+''
+)
+
+NB. nilad
+postyhCOMMIT =: 3 : 0
+NB. Accept if in CONFIRM state
+if. Gstate = GSCONFIRM do.
+  NB. If exposed and bag are empty, this actor gets no more words, so take the time away
+  if. exposedwords +:&(*@#) wordbag do. Gtimedisp =: 0 end.
+  NB. Display & Discard words that have been passed twice in a row
+  oldpass =. ((0;0 _1) -:"1 (0 2) {"1 prevexposedwords) # 1 {"1 prevexposedwords
+  newpass =. ((0;0 _1) -:"1 (0 2) {"1 Gturnwordlist) # 1 {"1 Gturnwordlist
+  retired =. newpass (e. # [) oldpass  NB. words passed twice in a row in the first round
+  '' addtolog ;@:(('discarded: ' , '<br>' ,~ ])&.>) retired
+  Gturnwordlist =: (retired -.@e.~ 1 {"1 Gturnwordlist) # Gturnwordlist
+  wordbag =: (retired -.@e.~ 1 {"1 wordbag) # wordbag
+  Gdqlist =: (retired -.@e.~ 1 {"1 Gdqlist) # Gdqlist
+
+  NB. Display & Discard words that have been marked as retired
+  handledmsk =. 1 = (2;1)&{::"1 Gturnwordlist  NB. words we finished
+  Gdqlist =: ((2 {."1 Gdqlist) -.@e. (handledmsk # 2 {."1 Gturnwordlist)) # Gdqlist  NB. Remove words we are showing now
+  htl =. handledmsk # Gturnwordlist  NB. the words we show everyone now
+NB. no more  Glogtext =: Glogtext , ((2;0)&{::"1 htl) ;@:(({::&('guessed late: ';'guessed: ')@[ , '<br>' ,~ ])&.>) 1 {"1 htl
+  Gturnwordlist =: (-. handledmsk) # Gturnwordlist  NB. The  words have now passed on
+  if. Gtimedisp=0 do.
+    NB. if no time left, handle end-of-turn
+    NB. Put the remaining turn words into the exposed list
+    exposedwords =: Gturnwordlist
+    NB. Also into the dqlist for the player who saw them
+    Gdqlist =: Gdqlist , (<Gactor) (<a:;2)} Gturnwordlist
+  end.
+  NB. Figure next state:
+  NB. GAMEOVER if the exposed and bag are still empty
+  if. exposedwords +:&(*@#) wordbag do. Gstate =: GSGAMEOVER
+  NB. CHANGE if it's a round change and there is time - change roundno first
+  elseif. (Gtimedisp~:0) *. Groundno~:nextroundno''do.
+    Gstate =: GSCHANGE
+    Groundno =: nextroundno''  NB. set new round# before going to CHANGE state
+  else.
+    NB. This is where end-of-turn happens.  Give the player's score
+    addtolog Gactor , ': ' , (, '' 8!:2 Gscore -&(Gteamup&{) prevscore) , ' points'
+    NB. Should be out of time, since there are no words to act.  Clear time just in case, and go look for next actor, from the other team
+    Gtimedisp =: 0 [ Gteamup =: -. Gteamup [ Gstate =: GSWACTOR [ Groundno =: nextroundno''
+  end. 
+end.
+''
+)
+postyhTICK =: 3 : 0
+NB. Ignore if not ACTING
+NB. Process through TIMERADJ
+if. Gstate = GSACTING do. postyhTIMERADJ Gteamup;_1;'' end.
+''
+)
+
+NB. Direct overrides of timer or score
+NB. team incr name
+postyhSCOREADJ =: 3 : 0
+'team incr name' =. y
+NB. Accept during SETTLE or CONFIRM only
+if. Gstate e. GSSETTLE,GSCONFIRM do.
+  Gscore =: (incr + team { Gscore) team} Gscore
+  if. *@# name do. addtolog '<font color=red>' , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' points' , ((incr>0){::' from ';' to ') , 'team ' , (":team) , '</font>' end.
+end.
+''
+)
+
+NB. stop/start  incr  name   if incr is 0, it's a start/stop
+postyhTIMERADJ =: 3 : 0
+'start incr name' =. y
+NB. If start/stop, handle only in ACTING/PAUSED state
+if. 0=incr do.
+  NB. If start/stop, handle only in ACTING/PAUSED state
+  if. Gstate e. GSACTING,GSPAUSE do. Gstate =: start { GSPAUSE,GSACTING end.
 else.
-  NB. Audit login name: >:3 chars, only valid alphas, no spaces
-  if. (3>#fmlogin) +. (12<#fmlogin) +. # fmlogin -. LOGINCHARS do.
-    wdmodal 'mb info mb_ok "Invalid Login" "Must be 3-12 letters and numbers, no spaces"'
-    i. 0 0 return.
+  NB. Accept timer changes during ACTING/PAUSE/SETTLE/CONFIRM
+  if. Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM do.
+    prevtime =. Gtimedisp   NB. Save time before change
+    NB. Apply change
+    Gtimedisp =: 0 >. Gtimedisp + incr
+    NB. Log it
+    if. *@# name do. addtolog '<font color=red>' , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' seconds ' , '</font>' end.
+    NB. Changing the clock-zero status is a change of state.
+    if. prevtime ~:&* Gtimedisp do.
+      if. Gtimedisp do.
+        NB. Transitioning from no time to some time.  We must have been in SETTLE.  If there are no words to act, we'll just count the time.  We assume
+        NB. everybody is ready to go
+        getnextword''   NB. Charge the queue, in case we processed it all
+        if. isnewround'' do.
+          Groundno =: nextroundno''  NB. set new round when going into CHANGE
+          Gstate =: GSCHANGE
+        else.
+          Gstate =: GSACTING  NB. continue acting
+        end.
+      else.
+        NB. Transitioning from some time to no time, i. e. the buzzer sounds.  If bothing to be scored, CONFIRM, otherwise SETTLE
+        Gturnblink =: 1  NB. Call for the buzzer
+        Gstate =: (Gturnwordlist +.&(*@#) Gwordqueue) { GSCONFIRM,GSSETTLE
+      end.
+    end.
   end.
 end.
-backcmd 'LOGIN ''',fmlogin,''''
-i. 0 0
+
+''
 )
-formbon_fmscoreadj0_button =: 3 : 0
-adj =. ": adjn =. {.!.0 (0)".fmscoreadj0
-if. adjn do. backcmd 'SCOREADJ 0;',adj,';''',Glogin,'''' end.
-i. 0 0
+
+
+getsk =: 3 : 0
 )
-formbon_fmscoreadj1_button =: 3 : 0
-adj =. ": adjn =. {.!.0 (0)".fmscoreadj1
-if. adjn do. backcmd 'SCOREADJ 1;',adj,';''',Glogin,'''' end.
-i. 0 0
-)
-formbon_fmteamshow_button =: 3 : 0
-if. 1=#Gteams do.
-  wdmodal 'mb info mb_ok "Teams Not Assigned Yet" *The players are:',LF,LF, ; ,&LF&.> ; Gteams
-elseif. 2=#Gteams do.
-  wdmodal 'mb info mb_ok "Teams" *' , , ,&LF"1 (,. '  ' ,"1 ])&:>/ (a: ,.~ Gteamnames)  ,. > Gteams
+sendcmd =: 4 : 0
+senddata =. x fileserv_addreqhdr_sockfileserver_ y
+rc =. sdconnect_jsocket_ sk;(}.qbm),<8090
+qprintf'rc '
+while. #senddata do.
+rc =. senddata sdsend_jsocket_ sk,0
+qprintf'rc '
+senddata =. (1{::rc) }. senddata
+recvdata =. ''
 end.
-i. 0 0
-)
-formbon_fmawaybrb_button =: 3 : 0
-wd 'set fmawaygone value 0'
-backcmd 'AWAYSTATUS ''' , Glogin , ''';' , ": fmawaybrb  NB. 0=here, 1=brb, 2=away
-i. 0 0
-)
-formbon_fmawaygone_button =: 3 : 0
-wd 'set fmawaybrb value 0'
-backcmd 'AWAYSTATUS ''' , Glogin , ''';' , 2 * ": fmawaybrb
-i. 0 0
-)
-formbon_fmtimerp5_button =: 3 : 0
-backcmd 'TIMERADJ ',(":Gteamup),';5;''' , Glogin , ''''  NB. team#, #seconds, login
-i. 0 0
-)
-formbon_fmtimerp15_button =: 3 : 0
-backcmd 'TIMERADJ ',(":Gteamup),';15;''' , Glogin , ''''
-i. 0 0
-)
-formbon_fmtimerm5_button =: 3 : 0
-backcmd 'TIMERADJ ',(":Gteamup),';_5;''' , Glogin , ''''
-i. 0 0
-)
-formbon_fmtimerm15_button =: 3 : 0
-backcmd 'TIMERADJ ',(":Gteamup),';_15;''' , Glogin , ''''
-i. 0 0
-)
-formbon_fmteamdeal_button =: 3 : 0
-backcmd 'DEAL 0'
-i. 0 0
-)
-formbon_fmstart_button =: 3 : 0
-backcmd 'START ''' , Glogin , ''''
-i. 0 0
-)
-
-
-formbon_fmtaboo60_button =: 3 : 0
-backcmd 'RDTIME 0 60'  NB. rd#, # seconds
-i. 0 0
-)
-formbon_fmtaboo90_button =: 3 : 0
-backcmd 'RDTIME 0 90'
-i. 0 0
-)
-formbon_fmtaboo120_button =: 3 : 0
-backcmd 'RDTIME 0 120'
-i. 0 0
-)
-formbon_fmcharades60_button =: 3 : 0
-backcmd 'RDTIME 1 60'  NB. rd#, # seconds
-i. 0 0
-)
-formbon_fmcharades90_button =: 3 : 0
-backcmd 'RDTIME 1 90'
-i. 0 0
-)
-formbon_fmcharades120_button =: 3 : 0
-backcmd 'RDTIME 1 120'
-i. 0 0
-)
-formbon_fmpassword60_button =: 3 : 0
-backcmd 'RDTIME 2 60'  NB. rd#, # seconds
-i. 0 0
-)
-formbon_fmpassword90_button =: 3 : 0
-backcmd 'RDTIME 2 90'
-i. 0 0
-)
-formbon_fmpassword120_button =: 3 : 0
-backcmd 'RDTIME 2 120'
-i. 0 0
-)
-
-
-
-formbon_fmretire0_button =: 3 : 0
-backcmd 'NEXTWORD 0 _1'   NB. score, retirewd
-i. 0 0
-)
-formbon_fmretire1_button =: 3 : 0
-backcmd 'NEXTWORD _1 0'
-i. 0 0
-)
-formbon_fmretire2_button =: 3 : 0
-backcmd 'NEXTWORD 1 1'
-i. 0 0
-)
-formbon_fmretire3_button =: 3 : 0
-backcmd 'NEXTWORD 0 0'
-i. 0 0
-)
-formbon_fmretire4_button =: 3 : 0
-backcmd 'NEXTWORD 0 1'
-i. 0 0
-)
-
-formbon_fmsieze0_button =: 3 : 0
-if. 1 < #capt =. buttoncaptions0 {::~ 2 ; (0{::buttoncaptions0) i. Gstate do.
-  NB. Replace ' with 'login'
-  backcmd (({.~ , ('''' , Glogin) , }.~) i.&'''')^:(''''&e.) capt
-elseif. 1 = #capt do.
-  ('formbon_sieze',capt)~''   NB. 1-character string is a local verb
-end.
-i. 0 0
-)
-formbon_fmsieze1_button =: 3 : 0
-if. 1 < #capt =. buttoncaptions1 {::~ 2 ; (0{::buttoncaptions1) i. Gstate do.
-  NB. Replace ' with 'login'
-  backcmd (({.~ , ('''' , Glogin) , }.~) i.&'''')^:(''''&e.) capt
-elseif. 1 = #capt do.
-  ('formbon_sieze',capt)~''   NB. 1-character string is a local verb
-end.
-i. 0 0
-)
-
-NB. Get words from clipboard
-DIRCHARS =: ''',-/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 '
-formbon_siezeW =: 3 : 0
-try.
-  wds =. , wd'clippaste'
-  wds =. <;._2 LF ,~ wds -. CR
-catch.
-  wds =. 0$a:
-end.
-wds =. deb&.> (e.&DIRCHARS # ])&.> wds  NB. Remove weird characters, excess blanks
-wds =. wds -. a:  NB. Remove empty words
-if. 0=#wds do. wdmodal 'mb info mb_ok "No words" "You didn''t put any words on the clipboard."' return. end.
-if. 15<#wds do. wdmodal 'mb info mb_ok "Too many words" "You have more than 15 words."' return. end.
-if. 30 < >./ #@> wds do. wdmodal 'mb info mb_ok "Too long" "One of your words is longer than 30 characters."' return. end.
-if. 'ok' -: tmb   =: wdmodal 'mb query mb_ok "Is this word list OK?" *', ; ,&LF&.> wds do.
-  backcmd 'WORDS ''',Glogin,''' ,&< ' , 5!:5 <'wds'
-end.
-)
-
-NB. The display for a single word
-FORM1wd =: 0 : 0
-cc fmwdrb?c0 radiobutton; set fmwdrb?c0 caption ""; cc fmwdrb?c1 radiobutton group; set fmwdrb?c1 caption ""; cc fmwdrb?c2 radiobutton group; set fmwdrb?c2 caption "";
-cc fmwdrb?c3 radiobutton group; set fmwdrb?c3 caption ""; cc fmwdrb?c4 radiobutton group; set fmwdrb?c4 caption ""; cc fmwdst? static; set fmwdst? font "Courier New" 16;
-)
-NB. The display for the grid
-FORMSETTLE =: 0 : 0
-pc formsettle escclose closeok owner;pn "Your words for this round";
-bin vg;
-grid shape 6;
-cc st0 static; set st0 text "Late";cc st1 static; set st1 text "Time";cc st2 static; set st2 text "???";cc st3 static; set st3 text "Pass";cc st4 static; set st4 text "Got";cc wd static; set wd text "";
-%2
-bin z;
-cc ok button; set ok caption "OK";
-bin z;
-)
-
-NB. Display the scoring form at the end
-BUTTdisps =: 0 1;0 0;0 _1;_1 0;1 1  NB. disp for Late Time ??? Pass Got
-formbon_siezeS =: 3 : 0
-NB. get the words of interest: turnwords and wordqueue, but only for the current round
-if. #dispwds =. Gturnwordlist , Gwordqueue do.
-  rdx =. I. (<Groundno) = 0 {"1 dispwds   NB. Indexes of modifiable words
-  NB. Create the form
-  buttons =. FORM1wd ;@:((rplc '?' ; ":)"_ 0) rdx
-  wd FORMSETTLE rplc '%2';buttons
-  NB. Based on the scoring (if any), create the form, for the scoring and the words
-  wdbutt =. BUTTdisps i. (<rdx;2) { dispwds
-  if. #wdbutt =. (#~  5 ~: {."1) wdbutt ,. rdx do. wd ('set fmwdrb',":@],'c',' value 1' ,~ ":@[)/"1 wdbutt end.
-  rdx ([: wd 'set fmwdst' , ":@[ , ' text *' , ])&>  (<rdx;1) { dispwds
-  NB. Display the form
-  wd 'pshow'
-end.
-)
-formsettle_ok_button =: 3 : 0
-wdq  =: wd 'q'
-NB. Extract the data from the form
-if. #checks =. (#~ (<,'1') = {:"1) wdq do.
-  buttsels =. (([: _9&". 6 }. _2 }. ]) , _9&".@{:)@> (#~  ('fmwdrb' -: 6&{.)@>) {."1 checks
-  buttsels =. ({. ; BUTTdisps {~ {:)"1 buttsels  NB. convert to index ; disposition
-  NB. Remove the values that have not changed
-  if. #buttsels =. (2 {"1 Gturnwordlist , Gwordqueue) (] #~ ({:@] -.@-: ({~ {.))"_ 1) buttsels do.
-    NB. Send the new values to the background
-    backcmd 'SCOREMOD ' , 5!:5 <'buttsels'
+for. i. 20 do.
+  rsockl =. 1 {:: sdselect_jsocket_ sk;'';sk;1000
+qprintf 'rsockl '
+  if. sk e. rsockl do.
+    'r data' =. sdrecv_jsocket_ sk,10000,0
+qprintf'r data '
+    if. 0=#data do. break. end.
+    recvdata =. recvdata , data
   end.
 end.
-NB. Close the word form
-formsettle_cancel''
+recvdata
 )
-formsettle_cancel =: 3 : 0
-heartbeatrcvtime =: _   NB. Stifle message while this form was displayed
-wd 'psel formsettle;pclose'  NB. selection may have been lost
+0 : 0
+(<'1111111') sendcmd 'INCR "t1000" "bonlog" "0"',CRLF,'a' [ getsk''
 )
-formsettle_close_button =: formsettle_cancel
+
 
 cocurrent 'z'
 NB. language extensions
@@ -1114,6 +1070,8 @@ FormalLevel =: 2 : 0
 )
 
 FormalFetch =: >@({&>/)@(<"0@|.@[ , <@]) " 1 _
+
+
 cocurrent 'z'
 NB. Routines for keyed lists (lists of key ; data [, data])
 
@@ -2058,7 +2016,6 @@ hsvtorgb =: 3 : 0"1 :. rgbtohsv
 'z d f' =. 3 2 60 #:!.0 h
 255 * (-z+d) |. v * 1 , |.^:(-.d) -. */\ s , -.^:(-.d) f % 60
 )
-
 
 NB. File server
 NB. Created when we get a connection on our listening socket
