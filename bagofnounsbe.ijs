@@ -3,6 +3,8 @@ require 'strings'
 require'format/printf'
 sdcleanup_jsocket_ =: 3 : '0[(sdclose ::0:"0@[ shutdownJ@(;&2)"0)^:(*@#)SOCKETS_jsocket_'
 
+NB. Back end
+
 NB. Game states
 GSHELLO =: 0  NB. Initial login at station: clear username, clear incrhwmk
 GSLOGINOK =: 1  NB. OK to log in
