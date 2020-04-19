@@ -1,9 +1,10 @@
 NB. manifest for bagofnouns
 CAPTION=: 'Distributed game controller'
-VERSION=: '1.0.38'
+VERSION=: '1.0.39'
 PLATFORMS=: ''
 FILES=: 0 : 0
 bagofnouns.ijs
+bagofnounsbe.ijs
 bagofnounsgui.ijs
 )
 RELEASE=: ''
