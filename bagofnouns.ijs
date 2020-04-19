@@ -8,7 +8,7 @@ rc =. sdbind_jsocket_ lsk ; AF_INET_jsocket_ ; '' ; 8090  NB. listen on port 809
 sdcleanup_jsocket_''  NB. stop listening
 if. 0~:rc do.
   NB. socket already bound - load the gui
-  load '~addons/games/bagofnouns/bagofnounsbe.ijs'
+  load '~addons/games/bagofnouns/bagofnounsgui.ijs'
   formbon_run''
 else.
   NB. socket not bound - reset & start the backend
