@@ -593,8 +593,9 @@ wd 'set fmretire4 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gactor)
 
 NB. Display modal dialog and then suppress slow msg
 wdmodal =: 3 : 0
-wd y
+res =. wd y
 heartbeatrcvtime =: _   NB. Stifle message while this form was displayed
+res
 )
 
 NB. Button processors
@@ -764,7 +765,7 @@ wds =. wds -. a:  NB. Remove empty words
 if. 0=#wds do. wdmodal 'mb info mb_ok "No words" "You didn''t put any words on the clipboard."' return. end.
 if. 15<#wds do. wdmodal 'mb info mb_ok "Too many words" "You have more than 15 words."' return. end.
 if. 30 < >./ #@> wds do. wdmodal 'mb info mb_ok "Too long" "One of your words is longer than 30 characters."' return. end.
-if. 'ok' -: tmb   =: wdmodal 'mb query mb_ok "Is this word list OK?" *', ; ,&LF&.> wds do.
+if. 'ok' -: wdmodal 'mb query mb_ok "Is this word list OK?" *', ; ,&LF&.> wds do.
   backcmd 'WORDS ''',Glogin,''' ,&< ' , 5!:5 <'wds'
 end.
 )
