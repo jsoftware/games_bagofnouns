@@ -679,8 +679,7 @@ if. Gstate = GSCONFIRM do.
 
   NB. show the player's score for this round
   rdscore =. +/ {."1 > 2 {"1 (<Groundno) (] #~ (= {."1)) Gturnwordlist
-  addtolog Gactor , ': ' , (, '' 8!:2 rdscore) , ' pts ' , Groundno{::'(taboo)';'(charades)';'(password)
-'
+  addtolog Gactor , ': ' , (, '' 8!:2 rdscore) , ' pts ' , Groundno{::'(taboo)';'(charades)';'(password)'
   handledmsk =. 1 <: (2;1)&{::"1 Gturnwordlist  NB. words we finished
   Gdqlist =: ((2 {."1 Gdqlist) -.@e. (handledmsk # 2 {."1 Gturnwordlist)) # Gdqlist  NB. Remove words we are showing now
   htl =. handledmsk # Gturnwordlist  NB. the words we are showing everyone now
