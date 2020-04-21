@@ -137,7 +137,7 @@ grid colstretch 0 5; grid colstretch 1 1;
   cc fmgeneral edith;set fmgeneral edit 0;set fmgeneral sizepolicy expanding;set fmgeneral font "Courier New" 32 bold;
   rem row 4: move to the next word;
   bin h;
-   cc fmretire4 button;set fmretire4 sizepolicy expanding;set fmretire4 font "Courier New" 24;set fmretire4 text "Got It Late";
+   cc fmretire4 button;set fmretire4 sizepolicy expanding;set fmretire4 font "Courier New" 24;
    bin s;
    cc fmretire3 button;set fmretire3 sizepolicy expanding;set fmretire3 font "Courier New" 24;set fmretire3 text "Time Expired";
    bin s;
@@ -150,7 +150,7 @@ grid colstretch 0 5; grid colstretch 1 1;
   rem row 5: general purpose buttons;
   bin h;
    cc fmsieze0 button;set fmsieze0 sizepolicy expanding;set fmsieze0 font "Courier New" 24;set fmsieze0 text "";
-  bin s;
+   cc fmbagstatus static center;set fmbagstatus font "Courier New" 24;set fmbagstatus text "";
    cc fmsieze1 button;set fmsieze1 sizepolicy expanding;set fmsieze1 font "Courier New" 24;set fmsieze1 text "";
   bin z;
   rem row 6: status line;
@@ -161,7 +161,7 @@ grid colstretch 0 5; grid colstretch 1 1;
 bin z;
 pas 0 0;
 )
-cleargame=:0
+
 formbon_run =: 3 : 0
 sdcleanup_jsocket_''
 conntoback 4000
@@ -170,7 +170,6 @@ wd :: 0: 'psel formbon;pclose'
 wd FORMBON
 wd 'set fmretire0 text *Don''t',LF,'Know It'
 wd 'set fmretire2 text *Got',LF,'It'
-wd 'set fmretire4 text *Got',LF,'It',LF,'Late'
 wd 'set fmretire3 text *Time',LF,'Expired'
 wd 'pshow'
 
@@ -205,7 +204,7 @@ rc =. sdconnect_jsocket_ sk;(}.thismachine),<8090  NB. start connecting
 if. sk e. 2 {:: sdselect_jsocket_ '';sk;'';y do.
   NB. Start with a message to say we arrived.  The response must set all our globals
   Gstate =: GSHELLO  NB. initial state to help ignoring one-shots
-  backcmd 'HELLO ',":cleargame
+  backcmd 'HELLO ', ": {.!.0 ". 'cleargame'
   cleargame=:0  NB. Don't do it again accidentally
   0
 else.
@@ -294,7 +293,7 @@ end.
 )
 
 NB. Order of processing state info
-statepri =: (;: 'Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordundook Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
+statepri =: (;: 'Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordundook Gbagstatus Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
 NB. Process the command queue, which is a list of boxes.  Each box contains
 NB. the 5!:5 of a table of state information, as
 NB. infotype ; value
@@ -325,7 +324,7 @@ if. Glogin -: '*' do.
 elseif. loggedin do.
   wd 'set fmloggedin text *' , Glogin , ' is logged in here'
 else.
-  wd 'set fmloggedin text *Login by selecting or entering your name'
+  wd 'set fmloggedin text *Login by selecting' , ((Gstate=GSWORDS) # ' or entering') , ' your name'
 end.
 ''
 )
@@ -507,12 +506,18 @@ wd 'set fmlog text *',Glogtext
 ''
 )
 
+handGbagstatus =: 3 : 0
+wd 'set fmbagstatus text *', ": Gbagstatus
+''
+)
+
+
 handGturnwordlist =: 3 : 0
 if. Gstate = GSCONFIRM do.   NB. display words in CONFIRM state, where they might be changed by a SCOREMOD without changing state
   NB. Extract the words that are being retired
-  rwords =. (#~ 1 = (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words.  wordqueue must be empty
+  rwords =. (#~ 1 <: (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words.  wordqueue must be empty
   if. #rwords do.
-    rwords =. <@(1&{:: , ' (late)' #~ 0 = (2;0)&{::)"1 rwords  NB. word text, with late words indicated
+    rwords =. <@(1&{:: , ('';' (late)';' (foul)') {::~ (1 1;0 1) i. 2&{)"1 rwords  NB. word text, with late words indicated
     wd 'set fmgeneral text *' , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'Words: ', _2 }. ; ,&', '&.> rwords
   else.
     wd 'set fmgeneral text *' , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'No words were scored.'
@@ -523,37 +528,61 @@ end.
 
 
 APSinstructions =: <;._2 (0 : 0)
-<small>Play in order.  Word stays red until scored:</small><ul>
-Clock is stopped - wait<ul>
-<small>Words left over.  Handle the word in red (usually Time Expired), or use big buttons to review scores.</small><ul>
+<small>Play in order.  Word turns from red to blue when scored:</small>
+Clock is stopped - wait
+<small>Words left over.  Handle the word in red (usually Time Expired), or use big buttons to review scores.</small>
 )
 handGwordqueue =: 3 : 0
 if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
   if. Glogin -: Gactor do.
-    NB. Special display for the actor.  Prefix it with instructions
-    text =. ((GSACTING,GSPAUSE,GSSETTLE) i. Gstate) { APSinstructions
-    if. #Gwordqueue do.
-      NB. Show the queue, with an indication of how the words were scored, if they were
-      words =. 1 {"1 Gwordqueue
-      scoretag =. ((0 _1;_1 0;1 1;0 0;0 1) i. 2 {"1 Gwordqueue) { ' (didn''t know it)';' (passed -1)';' (scored +1)';' (time expired)';' (guessed late)';''
-      if. *@#words do. words =. (('<font color=red>' , ,&'</font>')&.> {. words) 0} words end.
-      text =. text , <@('<li>' , ;)"1 words,.scoretag
-    else.
-      NB. No words should be possible only in CONFIRM state
+    NB. Special display for the actor or actor/scorer.  Prefix it with instructions
+    NB. Format the words we have acted this round (if any)
+    if. #twds =. (<Groundno) (] #~ (= {."1)) Gturnwordlist do.
+      ftwds =. 1 {"1 twds
+      scoretag =. ((0 _1;_1 0;1 1;0 0;0 1;0 2) i. 2 {"1 twds) { ' (didn''t know it)';' (passed -1)';' (scored +1)';' (time expired)';' (guessed late)';' (foul)';''
+      ftwds =. (('<small><font color=blue>' , ,&'</font></small>')&.>
+      ftwds =. ftwds ,&.> scoretag
+    else. ftwds =. 0$a:
     end.
-    wd 'set fmgeneral text *' , ; text
+    NB. Format the word queue (should always be some in an acting state)
+    if. #wwds =. Gwordqueue do.
+      fwwds =. 1 {"1 wwds
+      scoretag =. ((0 _1;_1 0;1 1;0 0;0 1;0 2) i. 2 {"1 wwds) { ' (didn''t know it)';' (passed -1)';' (scored +1)';' (time expired)';' (guessed late)';' (foul)';''
+      fwwds =. 1 (('<big><font color=red>' , ,&'</font></big>')&.>@{. , ('<small>' , ,&'</small>')&.>@}.) fwwds
+      fwwds =. fwwds ,&.> scoretag
+    else. fwwds =. 0$a:
+    end.
+    NB. Select words to show, format as list
+    showwds =. ({.^:(*@#) ftwds) , fwwds
+    showwds =. ('<ul>' , ,&'</ul>') ;@:(('<li>' , ,&'</li>')&.>) showwds  NB. Make each word a list element, and the whole thing a list
+    instr =. ((GSACTING,GSPAUSE,GSSETTLE) i. Gstate) {:: APSinstructions
+    wd 'set fmgeneral text *' , instr , showwds
   else.
     NB. For non-actors, indicate DQ status for the word, if there is still time
     if. Gstate e. GSACTING,GSPAUSE do.
       if. #Gwordqueue do.
         NB. See who is DQd from the acting team
         dqplrs =. (((<0;0 1) { Gwordqueue) -:"1 (2 {."1 Gdqlist)) # 2 {"1 Gdqlist 
-        text =. 'DQ: '&,^:(*@#) ;:^:_1 dqplrs -. ((-. Gteamup) {:: Gteams) , <Gactor 
-      else. text =. ''
+        dqtext =. 'DQ: '&,^:(*@#) ;:^:_1 dqplrs -. ((-. Gteamup) {:: Gteams) , <Gactor 
+      else. dqtext =. ''
       end.
-      wd 'set fmgeneral text *' , text
+      NB. Give the scorer a summary of the scoring actions he has performed this round
+      if. Glogin -: Gscorer do.
+        if. #twds =. (<Groundno) (] #~ (= {."1)) Gturnwordlist do.
+          ftwds =. 1 {"1 twds
+          scoretype =. (0 _1;_1 0;1 1;0 0;0 1;0 2) i. 2 {"1 twds
+          ftwds =. a: (scoretype e. 0 1 3 6)} ftwds
+          scoretag =. scoretype { ' (didn''t know it)';' (passed -1)';' (scored +1)';' (time expired)';' (guessed late)';' (foul)';''
+          ftwds =. ftwds ,&.> scoretag
+        else. ftwds =. 0$a:
+        end.
+        showwds =. ('<ul>' , ,&'</ul>') ;@:(('<li>' , ,&'</li>')&.>) ftwds
+      else. showwds =. ''
+      end.
+      if. 0=#dqlist do. wd 'set fmgeneral scroll max' end.
+      wd 'set fmgeneral text *' , dqtext, showwds
     else.
-      wd 'set fmgeneral text *' , (*Gtimedisp) {:: 'Turn is over';'Scoring break, turn will continue'
+      wd 'set fmgeneral scroll max;set fmgeneral text *' , (*Gtimedisp) {:: 'Turn is over';'Scoring break, turn will continue'  NB. Reset scroll after scoring
     end.
   end.
 end.
@@ -574,7 +603,7 @@ if. Gbuttonblink -: '' do.
   wd , 'p<set fmretire>q< font "Courier New" 24;>'  (8!:2) i. 5
 elseif. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) *. Glogin -.@-: Gscorer do.
   NB. Blink only in word-scoring states, and not on the scorer's screen to avoid distraction
-  wd  'p<set fmretire>q< font "Courier New" 32 bold;>' (8!:2) (5 2 $0 _1  _1 0  1 1  0 0  0 1) i. Gbuttonblink
+  wd  'p<set fmretire>q< font "Courier New" 32 bold;>' (8!:2) 0 1 2 3 4 4 {~ (_2 ]\ 0 _1  _1 0  1 1  0 0  0 1  0 2) i. Gbuttonblink
 end.
 ''
 )
@@ -587,7 +616,9 @@ wd 'set fmscore0 text ',(":0 { Gscore),';set fmscore1 text ',":1 { Gscore
 handGtimedisp =: 3 : 0
 if. Gstate e. GSWACTOR,GSWSTART,GSACTING,GSPAUSE,GSSETTLE,GSCHANGE do. wd 'set fmprogress value *',": Gtimedisp end.
 wd 'set fmretire3 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gactor)
-wd 'set fmretire4 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gactor)
+wd 'set fmretire4 enable ' , ": ((Gstate e. GSACTING,GSPAUSE) *. (Glogin-:Gscorer)) +. (Gstate=GSSETTLE) *. (Glogin-:Gactor)
+wd 'set fmretire4 text *', (*@#Gtimedisp) {:: ('Foul/',LF,'Got',LF,'Late');'Foul'
+
 ''
 )
 
@@ -632,7 +663,7 @@ formbon_fmteamshow_button =: 3 : 0
 if. 1=#Gteams do.
   wdmodal 'mb info mb_ok "Teams Not Assigned Yet" *The players are:',LF,LF, ; ,&LF&.> ; Gteams
 elseif. 2=#Gteams do.
-  wdmodal 'mb info mb_ok "Teams" *' , , ,&LF"1 (,. '  ' ,"1 ])&:>/ (a: ,.~ Gteamnames)  ,. > Gteams
+  wdmodal 'mb info mb_ok "Teams" *' , ; ,&LF&.>  a: ,.~ Gteamnames  ,. > Gteams
 end.
 i. 0 0
 )
@@ -728,7 +759,7 @@ backcmd 'NEXTWORD 0 0'
 i. 0 0
 )
 formbon_fmretire4_button =: 3 : 0
-backcmd 'NEXTWORD 0 1'
+backcmd (*@#Gtimedisp){::'NEXTWORD 0 1';'NEXTWORD 0 2'
 i. 0 0
 )
 
@@ -773,14 +804,15 @@ end.
 NB. The display for a single word
 FORM1wd =: 0 : 0
 cc fmwdrb?c0 radiobutton; set fmwdrb?c0 caption ""; cc fmwdrb?c1 radiobutton group; set fmwdrb?c1 caption ""; cc fmwdrb?c2 radiobutton group; set fmwdrb?c2 caption "";
-cc fmwdrb?c3 radiobutton group; set fmwdrb?c3 caption ""; cc fmwdrb?c4 radiobutton group; set fmwdrb?c4 caption ""; cc fmwdst? static; set fmwdst? font "Courier New" 16;
+cc fmwdrb?c3 radiobutton group; set fmwdrb?c3 caption "";cc fmwdrb?c4 radiobutton group; set fmwdrb?c4 caption "";cc fmwdrb?c5 radiobutton group; set fmwdrb?c5 caption ""; cc fmwdst? static; set fmwdst? font "Courier New" 16;
 )
 NB. The display for the grid
 FORMSETTLE =: 0 : 0
 pc formsettle escclose closeok owner;pn "Your words for this round";
 bin vg;
-grid shape 6;
-cc st0 static; set st0 text "Late";cc st1 static; set st1 text "Time";cc st2 static; set st2 text "???";cc st3 static; set st3 text "Pass";cc st4 static; set st4 text "Got";cc wd static; set wd text "";
+grid shape 7;
+cc st0 static; set st0 text "Late";cc st1 static; set st1 text "Foul";cc st2 static; set st2 text "Time";cc st3 static; set st3 text "???";
+cc st4 static; set st4 text "Pass";cc st5 static; set st5 text "Got";cc wd static; set wd text "";
 %2
 bin z;
 cc ok button; set ok caption "OK";
@@ -788,7 +820,7 @@ bin z;
 )
 
 NB. Display the scoring form at the end
-BUTTdisps =: 0 1;0 0;0 _1;_1 0;1 1  NB. disp for Late Time ??? Pass Got
+BUTTdisps =: 0 1;0 2;0 0;0 _1;_1 0;1 1  NB. disp for Late Time ??? Pass Got
 formbon_siezeS =: 3 : 0
 NB. get the words of interest: turnwords and wordqueue, but only for the current round
 if. #dispwds =. Gturnwordlist , Gwordqueue do.
@@ -798,7 +830,7 @@ if. #dispwds =. Gturnwordlist , Gwordqueue do.
   wd FORMSETTLE rplc '%2';buttons
   NB. Based on the scoring (if any), create the form, for the scoring and the words
   wdbutt =. BUTTdisps i. (<rdx;2) { dispwds
-  if. #wdbutt =. (#~  5 ~: {."1) wdbutt ,. rdx do. wd ('set fmwdrb',":@],'c',' value 1' ,~ ":@[)/"1 wdbutt end.
+  if. #wdbutt =. (#~  6 ~: {."1) wdbutt ,. rdx do. wd ('set fmwdrb',":@],'c',' value 1' ,~ ":@[)/"1 wdbutt end.
   rdx ([: wd 'set fmwdst' , ":@[ , ' text *' , ])&>  (<rdx;1) { dispwds
   NB. Display the form
   wd 'pshow'

@@ -243,7 +243,7 @@ Glogtext =: Glogtext , y , x
 ''
 )
 
-gblifnames =: ;:'Gstate Gscore Gdqlist Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin Gturnwordlist Gbuttonblink Gturnblink'
+gblifnames =: ;:'Gstate Gscore Gdqlist Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin Gturnwordlist Gbuttonblink Gturnblink Gbagstatus'
 
 NB. Initial settings for globals shared with FE
 initstate =: 3 : 0
@@ -270,6 +270,7 @@ Gdqlist =. 0 3$a:
 Gturnwordlist =: 0 3$a:
 Gbuttonblink =: ''
 Gturnblink =: 0
+Gbagstatus =: 0 0 0
 NB.?lintsaveglobals
 )
 initstate''
@@ -332,6 +333,11 @@ end. end.
 res
 )
 
+NB. Calculate bagstatus whenever wordqueue or wordbag changes
+bagstatus =: 3 : 0
+Gbagstatus =: <: #/.~ (<"0 i.3) , {."1 Gwordqueue , exposedwords , wordbag
+''
+)
 NB. y is sequence or CRLF-delimited commands from the server.  We process them one by one,
 NB. making changes to the globals as we go.  Then, we send the changed globals to the FE.
 postsync =: 3 : 0
@@ -387,6 +393,7 @@ if. Gstate=GSWORDS do.
   NB. Remove matches for the word.  Could do plurals, Leveshtein, etc here
   words =. words -. ; 1 {"1 otherwords
   Gwordstatus =: (name;<words) ,~ otherwords
+  Gbagstatus =: # words
 end.
 ''
 )
@@ -433,6 +440,7 @@ NB. Gwordqueue =: ,: '1';'word';< ,<'dq'
   Groundno =: 0
   Gstate=:GSWACTOR
   Gtimedisp =: 0
+  bagstatus''  NB. Init display of # words per round left
 NB.?lintsaveglobals
 ''
 end.
@@ -518,8 +526,6 @@ if. Gstate e. GSWSTART,GSCHANGEWSTART do.
     NB.?lintonly Gturnwordlist =: ,: 1;'word';1 1
     NB. We save a copy of the exposedwords before we start so that we can delete words dismissed twice in a row
     prevexposedwords =: exposedwords
-    NB. Save the score for computing the player's total
-    prevscore =: Gscore
     NB. Move the acting player to the bottom of the priority list
     Gteams =: (< (Gteamup {:: Gteams) (-. , ]) <Gactor) Gteamup} Gteams
     NB.?lintonly prevexposedwords =: ,: 1;'word';1 1
@@ -534,6 +540,7 @@ end.
 NB. Add words to the word queue until it's full.  It holds 2 words
 NB. We always take from the exposedwords if there is one.  Otherwise we draw from the bag.
 NB. BUT: we never draw a word if it is a different round from the word on the stack
+NB. This never affects bagstatus
 getnextword =: 3 : 0
 while. 2 > #Gwordqueue do.
   nextrdwd =. ''  NB. Indicate no word added
@@ -580,6 +587,8 @@ if. (*@# Gwordqueue) *. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
   Gscore =: (score + Gteamup { Gscore) Gteamup} Gscore
   NB. Move the word from the wordqueue to the Gturnwordlist
   Gturnwordlist =: Gturnwordlist , (<score,retire) 2} {. Gwordqueue  NB. put rd/wd/score onto turnlist
+  NB. The word will be revealed to the scorer, if it is retired.  It might be unretired later, so DQ the scorer just in case
+  if. retired >: 1 do. Gdqlist =. Gdqlist , (<Gscorer) 2} {. Gwordqueue end.
   Gwordqueue =: }. Gwordqueue
   Gwordundook =: (<Groundno) e. 0 {"1 Gturnwordlist  NB. Allow undo if there's something to bring back
   NB. If we are still acting or paused, top up the qword queue
@@ -589,6 +598,7 @@ if. (*@# Gwordqueue) *. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
   if. isnewround'' do. Gstate =: GSCONFIRM end.
   NB. Blink the pressed button as an ack to the team
   Gbuttonblink =: score,retire  NB. This gets reset automatically
+  bagstatus''  NB. Update count of words yet to do
 end.
 ''
 )
@@ -612,6 +622,7 @@ if. Gwordundook *. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) do.
   NB. If we are SETTLING or CONFIRM, go into SETTLE until the queue is empty
   elseif. Gstate = GSCONFIRM do. Gstate =: GSSETTLE
   end.
+  bagstatus''  NB. Update count of words yet to do
 end.
 ''
 )
@@ -646,6 +657,7 @@ if. Gstate e. GSSETTLE,GSCONFIRM do.
   Gwordqueue =: unscored # wl
   NB. If the wordqueue is not empty, go to SETTLE, otherwise stay in CONFIRM
   Gstate =: (*@# Gwordqueue) { GSCONFIRM,GSSETTLE
+  bagstatus''  NB. Update count of words yet to do
 end.
 ''
 )
@@ -665,10 +677,13 @@ if. Gstate = GSCONFIRM do.
   wordbag =: (retired -.@e.~ 1 {"1 wordbag) # wordbag
   Gdqlist =: (retired -.@e.~ 1 {"1 Gdqlist) # Gdqlist
 
-  NB. Display & Discard words that have been marked as retired
-  handledmsk =. 1 = (2;1)&{::"1 Gturnwordlist  NB. words we finished
+  NB. show the player's score for this round
+  rdscore =. +/ {."1 > 2 {"1 (<Groundno) (] #~ (= {."1)) Gturnwordlist
+  addtolog Gactor , ': ' , (, '' 8!:2 rdscore) , ' pts ' , Groundno{::'(taboo)';'(charades)';'(password)
+'
+  handledmsk =. 1 <: (2;1)&{::"1 Gturnwordlist  NB. words we finished
   Gdqlist =: ((2 {."1 Gdqlist) -.@e. (handledmsk # 2 {."1 Gturnwordlist)) # Gdqlist  NB. Remove words we are showing now
-  htl =. handledmsk # Gturnwordlist  NB. the words we show everyone now
+  htl =. handledmsk # Gturnwordlist  NB. the words we are showing everyone now
 NB. no more  Glogtext =: Glogtext , ((2;0)&{::"1 htl) ;@:(({::&('guessed late: ';'guessed: ')@[ , '<br>' ,~ ])&.>) 1 {"1 htl
   Gturnwordlist =: (-. handledmsk) # Gturnwordlist  NB. The  words have now passed on
   if. Gtimedisp=0 do.
@@ -686,11 +701,11 @@ NB. no more  Glogtext =: Glogtext , ((2;0)&{::"1 htl) ;@:(({::&('guessed late: '
     Gstate =: GSCHANGE
     Groundno =: nextroundno''  NB. set new round# before going to CHANGE state
   else.
-    NB. This is where end-of-turn happens.  Give the player's score
-    addtolog Gactor , ': ' , (, '' 8!:2 Gscore -&(Gteamup&{) prevscore) , ' points'
+    NB. This is where end-of-turn happens.
     NB. Should be out of time, since there are no words to act.  Clear time just in case, and go look for next actor, from the other team
     Gtimedisp =: 0 [ Gteamup =: -. Gteamup [ Gstate =: GSWACTOR [ Groundno =: nextroundno''
   end. 
+  bagstatus''  NB. Update count of words yet to do
 end.
 ''
 )
@@ -741,7 +756,7 @@ else.
           Gstate =: GSACTING  NB. continue acting
         end.
       else.
-        NB. Transitioning from some time to no time, i. e. the buzzer sounds.  If bothing to be scored, CONFIRM, otherwise SETTLE
+        NB. Transitioning from some time to no time, i. e. the buzzer sounds.  If nothing to be scored, CONFIRM, otherwise SETTLE
         Gturnblink =: 1  NB. Call for the buzzer
         Gstate =: (Gturnwordlist +.&(*@#) Gwordqueue) { GSCONFIRM,GSSETTLE
       end.
