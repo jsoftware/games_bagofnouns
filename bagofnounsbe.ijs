@@ -393,7 +393,7 @@ if. Gstate=GSWORDS do.
   NB. Remove matches for the word.  Could do plurals, Leveshtein, etc here
   words =. words -. ; 1 {"1 otherwords
   Gwordstatus =: (name;<words) ,~ otherwords
-  Gbagstatus =: # words
+  Gbagstatus =: # ; 1 {"1 Gwordstatus
 end.
 ''
 )
@@ -578,7 +578,7 @@ if. -. *@# Gwordqueue do. 1 return. end.   NB. 1 if no words
 Groundno ~: (<0 0) {:: Gwordqueue   NB. 1 if top word is for different round
 )
 
-NB.  {-1 0 1} {01}   score, count wd as played
+NB.  {-1 0 1} {012}   score, count wd as played
 postyhNEXTWORD =: 3 : 0
 'score retire' =. y
 NB. Accept only if there is a word in the word queue, and if we are in a scorable state
@@ -588,7 +588,7 @@ if. (*@# Gwordqueue) *. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
   NB. Move the word from the wordqueue to the Gturnwordlist
   Gturnwordlist =: Gturnwordlist , (<score,retire) 2} {. Gwordqueue  NB. put rd/wd/score onto turnlist
   NB. The word will be revealed to the scorer, if it is retired.  It might be unretired later, so DQ the scorer just in case
-  if. retired >: 1 do. Gdqlist =. Gdqlist , (<Gscorer) 2} {. Gwordqueue end.
+  if. retire >: 1 do. Gdqlist =: Gdqlist , (<Gscorer) 2} {. Gwordqueue end.
   Gwordqueue =: }. Gwordqueue
   Gwordundook =: (<Groundno) e. 0 {"1 Gturnwordlist  NB. Allow undo if there's something to bring back
   NB. If we are still acting or paused, top up the qword queue

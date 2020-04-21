@@ -540,7 +540,7 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
     if. #twds =. (<Groundno) (] #~ (= {."1)) Gturnwordlist do.
       ftwds =. 1 {"1 twds
       scoretag =. ((0 _1;_1 0;1 1;0 0;0 1;0 2) i. 2 {"1 twds) { ' (didn''t know it)';' (passed -1)';' (scored +1)';' (time expired)';' (guessed late)';' (foul)';''
-      ftwds =. (('<small><font color=blue>' , ,&'</font></small>')&.>
+      ftwds =. ('<small><font color=blue>' , ,&'</font></small>')&.> ftwds
       ftwds =. ftwds ,&.> scoretag
     else. ftwds =. 0$a:
     end.
@@ -552,8 +552,8 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
       fwwds =. fwwds ,&.> scoretag
     else. fwwds =. 0$a:
     end.
-    NB. Select words to show, format as list
-    showwds =. ({.^:(*@#) ftwds) , fwwds
+    NB. Select words to show, format as list.  Always leave space for one word from turnwordlist, possibly empty
+    showwds =. ({: ftwds) , fwwds
     showwds =. ('<ul>' , ,&'</ul>') ;@:(('<li>' , ,&'</li>')&.>) showwds  NB. Make each word a list element, and the whole thing a list
     instr =. ((GSACTING,GSPAUSE,GSSETTLE) i. Gstate) {:: APSinstructions
     wd 'set fmgeneral text *' , instr , showwds
@@ -579,7 +579,7 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
         showwds =. ('<ul>' , ,&'</ul>') ;@:(('<li>' , ,&'</li>')&.>) ftwds
       else. showwds =. ''
       end.
-      if. 0=#dqlist do. wd 'set fmgeneral scroll max' end.
+      if. 0=#dqtext do. wd 'set fmgeneral scroll max' end.
       wd 'set fmgeneral text *' , dqtext, showwds
     else.
       wd 'set fmgeneral scroll max;set fmgeneral text *' , (*Gtimedisp) {:: 'Turn is over';'Scoring break, turn will continue'  NB. Reset scroll after scoring
