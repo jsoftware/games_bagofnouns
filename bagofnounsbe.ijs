@@ -578,7 +578,7 @@ if. -. *@# Gwordqueue do. 1 return. end.   NB. 1 if no words
 Groundno ~: (<0 0) {:: Gwordqueue   NB. 1 if top word is for different round
 )
 
-NB.  {-1 0 1} {012}   score, count wd as played
+NB.  {-1 0 1} {012}   score, count wd as played or foul
 postyhNEXTWORD =: 3 : 0
 'score retire' =. y
 NB. Accept only if there is a word in the word queue, and if we are in a scorable state
