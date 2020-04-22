@@ -13,16 +13,18 @@ NB. All the rest require a login to enable any buttons
 GSWORDS =: 3  NB. waiting for words to be entered
 GSWACTOR =: 4  NB. waiting for an actor.  Time has not started
 GSWSCORER =: 5   NB. Waiting for a scorer.  Time may have started
-GSWSTART =: 6   NB. Waiting for Start button
-GSACTING =: 7  NB. Acting words
-GSPAUSE =: 8   NB. Clock stopped during a round
-GSSETTLE =: 9  NB. Final scoring actions
-GSCONFIRM =: 10  NB. last chance to go back
-GSCHANGE =: 11   NB. Changing the round
-GSCHANGEWACTOR =: 12  NB. Waiting for actor to decide whether they want a scorer
-GSCHANGEWSCORER =: 13   NB. Changing the round in the middle of a turn, waiting for scorer
-GSCHANGEWSTART =: 14   NB. Changing the round in the middle of a turn, waiting to restart
-GSGAMEOVER =: 15
+GSWAUDITOR =: 6
+GSWSTART =: 7   NB. Waiting for Start button
+GSACTING =: 8  NB. Acting words
+GSPAUSE =: 9   NB. Clock stopped during a round
+GSSETTLE =: 10  NB. Final scoring actions
+GSCONFIRM =: 11  NB. last chance to go back
+GSCHANGE =: 12   NB. Changing the round
+GSCHANGEWACTOR =: 13  NB. Waiting for actor to decide whether they want a scorer
+GSCHANGEWSCORER =: 14   NB. Changing the round in the middle of a turn, waiting for scorer
+GSCHANGEWAUDITOR =: 15
+GSCHANGEWSTART =: 16   NB. Changing the round in the middle of a turn, waiting to restart
+GSGAMEOVER =: 17
 
 NB. Commands from FE/server
 0 : 0
@@ -104,7 +106,8 @@ while. do.
   if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.5 break. end.
 end.
 if. feconnlost do. feconnlost [ wd 'timer 0' [ smoutput 'fe connection lost'  return. end.
-NB. perform pre-sync command processing
+NB. perform pre-sync command processing.  First, remember state before this command
+gbls =. ".&.> gblifnames  NB. current values
 if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
 senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('INCR "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
 NB. Create a connection to the server and send all the data in an INCR command
@@ -114,7 +117,7 @@ for_dly. 1 1 300 # 1000 2000 3000 do.
   ssk =. 1 {:: sdsocket_jsocket_ ''  NB. listening socket
   sdioctl_jsocket_ ssk , FIONBIO_jsocket_ , 1  NB. Make socket non-blocking
   rc =. sdconnect_jsocket_ ssk;qbm,<8090
-  if. ssk e. sds   =. 2 {:: sdselect_jsocket_ '';ssk;'';dly do. break. end.
+  if. ssk e. 2 {:: sdselect_jsocket_ '';ssk;'';dly do. break. end.
   sdclose_jsocket_ ssk
   smoutput 'Error ' , (":rc) , ' connecting to server'
   qbm2 =. }. sdgethostbyname_jsocket_ 'www.quizbowlmanager.com'  NB. In case the address changed
@@ -158,10 +161,9 @@ if. #readdata do.
   NB. Process the response
   if. (rc=0) do.   NB. to handle login seq we must pass heartbeats through
 if. #data do. qprintf'data 'end.
-    incrhwmk   =: (0 >.incrhwmk) + #data  NB.Since we processed it, skip over this data in the future
+    incrhwmk =: (0 >.incrhwmk) + #data  NB.Since we processed it, skip over this data in the future
     postsync data
     NB. Send new state info to the front end
-    gbls =. ".&.> gblifnames  NB. current values
     chgmsk =. gbls ~: Ggbls  NB. see what's different
     diffs =. (chgmsk # gblifnames) ,. chgmsk # gbls
     Ggbls =: gbls  NB. save current values to be old state next time
@@ -194,7 +196,7 @@ sockloop =: 3 : 0
 'lsk tourn password' =. y
 while. do.   NB. loop here forever
   smoutput 'Waiting for connection'
-  incrhwmk   =: 0  NB. where we are in the host log
+  incrhwmk =: 0  NB. where we are in the host log
   qbm =. }. sdgethostbyname_jsocket_ 'www.quizbowlmanager.com'
   sdlisten_jsocket_ lsk,1
   sdselect_jsocket_ lsk;'';'';6000000   NB. Wait till front-end attaches
@@ -217,7 +219,7 @@ return.  NB. scaf
 end.
 )
 
-sys_timer  =: 3 : 0
+sys_timer =: 3 : 0
 try. rc =. sockpoll timerpms
 if. rc do.  NB. scaf
   sdclose_jsocket_ 1{::timerpms  NB. close fe socket before we rewait
@@ -243,7 +245,7 @@ Glogtext =: Glogtext , y , x
 ''
 )
 
-gblifnames =: ;:'Gstate Gscore Gdqlist Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin Gturnwordlist Gbuttonblink Gturnblink Gbagstatus'
+gblifnames =: ;:'Gstate Gscore Gdqlist Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin Gturnwordlist Gbuttonblink Gturnblink Gbagstatus Gteamnames Gauditor'
 
 NB. Initial settings for globals shared with FE
 initstate =: 3 : 0
@@ -271,6 +273,8 @@ Gturnwordlist =: 0 3$a:
 Gbuttonblink =: ''
 Gturnblink =: 0
 Gbagstatus =: 0 0 0
+Gteamnames =: 2$a:  NB. empty team names
+Gauditor =: ''
 NB.?lintsaveglobals
 )
 initstate''
@@ -286,6 +290,7 @@ end.
 
 presyhHELLO =: 3 : 0
 initstate''
+Gteamnames =: 'Red';'Black'
 if. 1 = 0 ". y do. incrhwmk =: _1 end.  NB. if parm 1, reset the game state to empty
 ''  NB. Nothing to send - functions as a tick
 )
@@ -411,7 +416,7 @@ postyhAWAYSTATUS =: 3 : 0
 'name status' =. y
 name =. <name
 NB. Accept at any time.  Filtering is done by FE
-Gawaystatus =: ((status = 1 2) <@# name) ,&.> -.&name&.> Gawaystatus
+Gawaystatus =: ((status = 1 2) <@#"0 name) ,&.> -.&name&.> Gawaystatus
 ''
 )
 
@@ -452,19 +457,20 @@ NB. Accept if in WACTOR (if type=1) or WSCORER (do=0 and name matches Gactor) or
 'name do needscorer' =. y
 if. do = (1 ,((name-:Gactor) { 2 2,:0 1),2) {~ (GSWACTOR,GSWSCORER,GSCHANGEWACTOR) i. Gstate do.
   if. do do.
-    NB. We are accepting a name.  Save it and move to WSCORER or WSTART
-    if. Gstate=GSCHANGEWACTOR do.
-      Gstate =: needscorer { GSCHANGEWSTART,GSCHANGEWSCORER 
+    NB. We are accepting a name.  Save it and move to WSCORER or WAUDITOR
+    if. Gstate=GSCHANGEWACTOR do.  NB. No name change in middle of round - looking for scorer/auditor
+      Gstate =: needscorer { GSCHANGEWAUDITOR,GSCHANGEWSCORER 
     else.
       Gactor =: name
       NB. If we changing rounds, interpolate CHANGE state
       if. Groundno ~: nextroundno'' do.
         Groundno =: nextroundno''
         Gstate =: GSCHANGE
-      else. Gstate =: needscorer { GSWSTART,GSWSCORER
+      else. Gstate =: needscorer { GSWAUDITOR,GSWSCORER
       end.
     end.
     Gscorer =: needscorer {:: name;''
+    Gauditor =: ''
   elseif. Gstate e. GSWSTART,GSWSCORER do.
     NB. We are taking an undo, necessarily from START/SCORER to ACTOR.  Forget the actor's name, and the scorer's
     Gactor =: Gscorer =: ''
@@ -511,6 +517,15 @@ if. (Gstate , do , (name-:Gactor) , (name-:Gscorer)) e. SCORERstates do.
   end.
 end.
 ''
+)
+
+NB. name, possibly empty
+postyhAUDITOR =: 3 : 0
+NB. Accept if WAUDITOR or CHANGEWAUDITOR
+if. Gstate e. GSWAUDITOR,GSCHANGEWAUDITOR do.
+  Gauditor =: y
+  Gstate =: (Gstate=GSCHANGEWAUDITOR) { GSWSTART,GSCHANGEWSTART
+end.
 )
 
 NB. nilad
@@ -587,8 +602,8 @@ if. (*@# Gwordqueue) *. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
   Gscore =: (score + Gteamup { Gscore) Gteamup} Gscore
   NB. Move the word from the wordqueue to the Gturnwordlist
   Gturnwordlist =: Gturnwordlist , (<score,retire) 2} {. Gwordqueue  NB. put rd/wd/score onto turnlist
-  NB. The word will be revealed to the scorer, if it is retired.  It might be unretired later, so DQ the scorer just in case
-  if. retire >: 1 do. Gdqlist =: Gdqlist , (<Gscorer) 2} {. Gwordqueue end.
+  NB. The word will be revealed to the scorer and auditor, if it is retired.  It might be unretired later, so DQ the scorer and auditor just in case
+  if. retire >: 1 do. Gdqlist =: Gdqlist , (~. a: -.~ Gauditor;Gscorer) ,"1 0~ (<0;0 1) { Gwordqueue end.
   Gwordqueue =: }. Gwordqueue
   Gwordundook =: (<Groundno) e. 0 {"1 Gturnwordlist  NB. Allow undo if there's something to bring back
   NB. If we are still acting or paused, top up the qword queue
@@ -629,9 +644,10 @@ end.
 
 NB. nilad
 postyhPROCEED =: 3 : 0
-NB. Valid only in CHANGE state.  If the timer is running, go to CHANGEWACTOR, otherwise WSCORER or WSTART
+NB. Valid in CHANGE state.  If the timer is running, go to CHANGEWACTOR, otherwise WSCORER or WSTART
 if. Gstate=GSCHANGE do.
-  Gstate =: (Gtimedisp=0) { GSCHANGEWACTOR,(*@#Gscorer){GSWSCORER,GSWSTART
+  NB. At start, Gscorer is null if we need a scorer, otherwise set to same as Gactor
+  Gstate =: (Gtimedisp=0) { GSCHANGEWACTOR,(*@#Gscorer){GSWSCORER,GSWAUDITOR
 end.
 ''
 )

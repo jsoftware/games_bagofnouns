@@ -8,18 +8,20 @@ GSLOGINOK =: 1  NB. OK to log in
 GSAUTH =: 2  NB. Authenticating credentials
 NB. All the rest require a login to enable any buttons
 GSWORDS =: 3  NB. waiting for words to be entered
-GSWACTOR =: 4  NB. waiting for an actor
-GSWSCORER =: 5   NB. Waiting for a scorer
-GSWSTART =: 6   NB. Waiting for Start button
-GSACTING =: 7  NB. Acting words
-GSPAUSE =: 8   NB. Clock stopped during a round
-GSSETTLE =: 9  NB. Final scoring actions
-GSCONFIRM =: 10  NB. last chance to go back
-GSCHANGE =: 11   NB. Changing the round
-GSCHANGEWACTOR =: 12  NB. Waiting for actor to decide whether they want a scorer
-GSCHANGEWSCORER =: 13   NB. Changing the round in the middle of a turn, waiting for scorer
-GSCHANGEWSTART =: 14   NB. Changing the round in the middle of a turn, waiting to restart
-GSGAMEOVER =: 15
+GSWACTOR =: 4  NB. waiting for an actor.  Time has not started
+GSWSCORER =: 5   NB. Waiting for a scorer.  Time may have started
+GSWAUDITOR =: 6
+GSWSTART =: 7   NB. Waiting for Start button
+GSACTING =: 8  NB. Acting words
+GSPAUSE =: 9   NB. Clock stopped during a round
+GSSETTLE =: 10  NB. Final scoring actions
+GSCONFIRM =: 11  NB. last chance to go back
+GSCHANGE =: 12   NB. Changing the round
+GSCHANGEWACTOR =: 13  NB. Waiting for actor to decide whether they want a scorer
+GSCHANGEWSCORER =: 14   NB. Changing the round in the middle of a turn, waiting for scorer
+GSCHANGEWAUDITOR =: 15
+GSCHANGEWSTART =: 16   NB. Changing the round in the middle of a turn, waiting to restart
+GSGAMEOVER =: 17
 
 NB. Commands from FE/server
 0 : 0
@@ -112,12 +114,15 @@ grid colstretch 0 5; grid colstretch 1 1;
  bin g;
  grid shape 6 1;
  grid rowheight 0 30; grid rowheight 1 10; grid rowheight 2 200; grid rowheight 3 40; grid rowheight 4 40; grid rowheight 5 30;
- grid rowstretch 0 2; grid rowstretch 1 1; grid rowstretch 2 4; grid rowstretch 3 2; grid rowstretch 3 2; grid rowstretch 5 2;
+ grid rowstretch 0 2; grid rowstretch 1 1; grid rowstretch 2 6; grid rowstretch 3 1; grid rowstretch 3 1; grid rowstretch 5 2;
   rem top row: scores & login;
   bin h;
    bin h;
     bin s1;cc fmscoreadj0 edit center;set fmscoreadj0 inputmask #d;set fmscoreadj0 wh 20 20;bin s1;
-    cc fmscore0 static center;set fmscore0 minwh 20 20;set fmscore0 sizepolicy expanding;set fmscore0 font "Courier New" 64 bold;
+    bin v;
+     cc fmtmname0 static center;set fmtmname0 minwh 20 20;set fmtmname0 sizepolicy expanding;set fmtmname0 font "Courier New" 12 bold;
+     cc fmscore0 static center;set fmscore0 minwh 20 20;set fmscore0 sizepolicy expanding;set fmscore0 font "Courier New" 64 bold;
+    bin z;
    bin z;
    bin s;
    bin v;
@@ -127,7 +132,10 @@ grid colstretch 0 5; grid colstretch 1 1;
    bin z;
    bin s;
    bin h;
-    cc fmscore1 static center;set fmscore1 minwh 20 20;set fmscore1 sizepolicy expanding;set fmscore1 font "Courier New" 64 bold;
+    bin v;
+     cc fmtmname1 static center;set fmtmname1 minwh 20 20;set fmtmname1 sizepolicy expanding;set fmtmname1 font "Courier New" 12 bold;
+     cc fmscore1 static center;set fmscore1 minwh 20 20;set fmscore1 sizepolicy expanding;set fmscore1 font "Courier New" 64 bold;
+    bin z;
     bin s1;cc fmscoreadj1 edit center;set fmscoreadj1 inputmask #d;set fmscoreadj1 wh 20 20;bin s1;
    bin z;
   bin z;
@@ -171,6 +179,8 @@ wd FORMBON
 wd 'set fmretire0 text *Don''t',LF,'Know It'
 wd 'set fmretire2 text *Got',LF,'It'
 wd 'set fmretire3 text *Time',LF,'Expired'
+NB. We have to shadow the away buttons ourselves, since we can't query them
+awaybrb =: awaygone =: 0
 wd 'pshow'
 
 NB. Start a heartbeat
@@ -293,7 +303,7 @@ end.
 )
 
 NB. Order of processing state info
-statepri =: (;: 'Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordundook Gbagstatus Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
+statepri =: (;: 'Gteamnames Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordundook Gbagstatus Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
 NB. Process the command queue, which is a list of boxes.  Each box contains
 NB. the 5!:5 of a table of state information, as
 NB. infotype ; value
@@ -316,6 +326,12 @@ wd 'psel formbon'
 for_h. statepri (<./@:i. }. [) {."1 cmds do. ('hand',>h)~ '' end.
 ''
 )
+
+handGteamnames =: 3 : 0
+wd '01' ('set fmtmname',[,' text *',])&> Gteamnames
+''
+)
+
 NB. The handlers, in priority order.  They all return empty
 handGlogin =: 3 : 0
 loggedin =: 3 < #Glogin
@@ -355,39 +371,37 @@ handGdqlist =: 3 : 0
 ''
 )
 
-Gteamnames =: 'Red';'Black'
-
 NB. Button-enable based on state
-NB. rows are buttons, columns are state. c1 is always 1, l1 only if logged in
-NB.             HELLO LOGINOK AUTH WORDS WACTOR WSCORER WSTART ACTING PAUSE SETTLE CONFIRM CHANGE CHANGEWACTOR CHANGEWSCORER CHANGEWSTART GAMEOVER
+NB. rows are buttons, columns are state. c1 is always 1, l1 only if logged in. a is 'not actor', A is 'actor', la is 'logged in not actor', S01 is 'scorer in rds 0&1' 
+NB.             HELLO LOGINOK AUTH WORDS WACTOR WSCORER WAUD WSTART ACTING PAUSE SETTLE CONFIRM CHANGE CHANGEWACT CHANGEWSCO CHANGWAUD CHANGEWSTART GAMEOVER
 statetoenable =: ;:;._2 (0 : 0)
-fmteamshow       l0     l0     l0   l1     l1     l1      l1     l1    l1     l1     l1     l1      l1             l1             l1         c0
-fmawaybrb        l0     l0     l0   l1     l1     l1      l1     l1    l1     l1     l1     l1      l1             l1             l1         c0
-fmawaygone       l0     l0     l0   l1     l1     l1      l1     l1    l1     l1     l1     l1      l1             l1             l1         c0
-fmtimerp5        l0     l0     l0   l0     l0     l0      l0     l1    l1     l1     l0     l0      l0             l0             l0         c0
-fmtimerp15       l0     l0     l0   l0     l0     l0      l0     l1    l1     l1     l0     l0      l0             l0             l0         c0
-fmtimerm5        l0     l0     l0   l0     l0     l0      l0     l1    l1     l1     l0     l0      l0             l0             l0         c0
-fmtimerm15       l0     l0     l0   l0     l0     l0      l0     l1    l1     l1     l0     l0      l0             l0             l0         c0
-fmteamdeal       l0     l0     l0   l1     l0     l0      l0     l0    l0     l0     l0     l0      l0             l0             l0         c0
-fmcharades60     l0     l0     l0   l1     l0     l0      l0     l0    l0     l0     l0     l0      l0             l0             l0         c0
-fmcharades90     l0     l0     l0   l1     l0     l0      l0     l0    l0     l0     l0     l0      l0             l0             l0         c0
-fmscoreadj0      l0     l0     l0   l0     l0     l0      l0     l0    l0     l1     l1     l0      l0             l0             l0         c0
-fmlogin          c0     l1     l1   c1     c1      a       as     as    as     as    as     as      as              a              a         c0
-fmscoreadj1      l0     l0     l0   l0     l0     l0      l0     l0    l0     l1     l1     l0      l0             l0             l0         c0
-fmretire0        l0     l0     l0   l0     l0     l0      l0      S     S      A     l0     l0      l0             l0             l0         c0
-fmretire1        l0     l0     l0   l0     l0     l0      l0      S     S      A     l0     l0      l0             l0             l0         c0
-fmretire2        l0     l0     l0   l0     l0     l0      l0      S     S      A     l0     l0      l0             l0             l0         c0
-fmsieze0         l0     l0     l0   l1      T     A       S     l1     S      A      A      A       A              A               S         c0
-fmsieze1         l0     l0     l0   l0      T     l1      AS     Sw    Sw     Aw     Aw     l0      A              l1             AS         c0
+fmteamshow       l0     l0     l0   l1     l1     l1      l1     l1    l1    l1     l1     l1     l1      l1          l1        l1     l1         c0
+fmawaybrb        l0     l0     l0   l1     l1     l1      l1     l1    l1    l1     l1     l1     l1      l1          l1        l1     l1         c0
+fmawaygone       l0     l0     l0   l1     l1     l1      l1     l1    l1    l1     l1     l1     l1      l1          l1        l1     l1         c0
+fmtimerp5        l0     l0     l0   l0     l0     l0      l0     l0    l1    l1     l1     l0     l0      l0          l0        l0     l0         c0
+fmtimerp15       l0     l0     l0   l0     l0     l0      l0     l0    l1    l1     l1     l0     l0      l0          l0        l0     l0         c0
+fmtimerm5        l0     l0     l0   l0     l0     l0      l0     l0    l1    l1     l1     l0     l0      l0          l0        l0     l0         c0
+fmtimerm15       l0     l0     l0   l0     l0     l0      l0     l0    l1    l1     l1     l0     l0      l0          l0        l0     l0         c0
+fmteamdeal       l0     l0     l0   l1     l0     l0      l0     l0    l0    l0     l0     l0     l0      l0          l0        l0     l0         c0
+fmcharades60     l0     l0     l0   l1     l0     l0      l0     l0    l0    l0     l0     l0     l0      l0          l0        l0     l0         c0
+fmcharades90     l0     l0     l0   l1     l0     l0      l0     l0    l0    l0     l0     l0     l0      l0          l0        l0     l0         c0
+fmscoreadj0      l0     l0     l0   l0     l0     l0      l0     l0    l0    l0     l1     l1     l0      l0          l0        l0     l0         c0
+fmlogin          c0     l1     l1   c1     c1      a       a     as    as    as     as     as     as      as           a         a      a         c0
+fmscoreadj1      l0     l0     l0   l0     l0     l0      l0     l0    l0    l0     l1     l1     l0      l0          l0        l0     l0         c0
+fmretire0        l0     l0     l0   l0     l0     l0      l0     l0   S01   S01      A     l0     l0      l0          l0        l0     l0         c0
+fmretire1        l0     l0     l0   l0     l0     l0      l0     l0   S01   S01      A     l0     l0      l0          l0        l0     l0         c0
+fmretire2        l0     l0     l0   l0     l0     l0      l0     l0     S     S      A     l0     l0      l0          l0        l0     l0         c0
+fmsieze0         l0     l0     l0   l1      T     A       A      S     l1     S      A      A      A       A           A         A      S         c0
+fmsieze1         l0     l0     l0   l0      T     l1      la     AS    Sw    Sw     Aw     Aw     l0       A          l1        la     AS         c0
 )
 
 handGstate =: 3 : 0
 NB. Set conditional enables
 'c0 c1 l0 l1' =. ":"0 , (1,loggedin) *./ 0 1
-'a s as A S AS' =. ":"0 (3 # 1,loggedin) *. (Glogin -: Gactor) (-.@[ , -.@] , +: , [ , ] , +.) (Glogin -: Gscorer)
+'a s as la A S AS S01' =. ":"0 (3 5 # 1,loggedin) *. (Glogin -: Gactor) (-.@[ , -.@] , -.@[ , +: , [ , ] , +. , ((Groundno<2) *. ])) (Glogin -: Gscorer)
 T =. ":"0 (<Glogin) e. Gteamup {:: Gteams
 NB. Select the column; get mask to discard 'Sw', which we do later
-EM   =: enmsk =. ('Sw';'Aw') -.@:e.~ EV   =: envals =. (>:Gstate) {"1 statetoenable
+enmsk =. ('Sw';'Aw') -.@:e.~ envals =. (>:Gstate) {"1 statetoenable
 NB. Set all the enables
 ({."1 statetoenable) ([: wd 'set ',[,' enable ',".@])&>&(enmsk&#) envals
 NB. Set display for the variable buttons
@@ -404,6 +418,7 @@ case. GSWACTOR do.
   wd 'set fmgeneral text *Next up: ' , ((Gteamup;0) {:: Gteams) , ' then ' , ((Gteamup;1) {:: Gteams)
   text =. 'Need player for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
 case. GSWSCORER do. text =. 'Need someone to score for ' , Gactor
+case. GSWAUDITOR do. text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
 case. GSWSTART do.
   wd 'set fmgeneral text *' , (Glogin-:Gscorer) # 'You may fire when you are ready, Gridley.'
   text =. Gscorer , ', start the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
@@ -419,6 +434,7 @@ case. GSCHANGEWACTOR do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Do you want a scorer for the ',(Groundno {:: 'Taboo';'Charades';'Password'),' round?'
   text =. 'Does ' , Gactor , ' need a scorer for ',(Groundno {:: 'Taboo';'Charades';'Password'),'?' 
 case. GSCHANGEWSCORER do. text =. 'Need someone to score for ' , Gactor
+case. GSCHANGEWAUDITOR do. text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
 case. GSCHANGEWSTART do.
   wd 'set fmgeneral text *' , (Glogin-:Gscorer) # 'You may fire when you are ready, Gridley.'
   text =. Gscorer , ', start the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
@@ -433,6 +449,7 @@ buttoncaptions0 =: (<@;)`(<@(,&a:))`(<@(,&a:))"1 ".&.> |: ;:@(LF&(('*'&(I.@:=)@]
 GSWORDS 'Enter Words*From Clipboard' 'W'
 GSWACTOR 'I will play*and score' 'ACTOR '';1;0'
 GSWSCORER 'Undo!  I don''t*want to play'    'ACTOR '';0;0'
+GSWAUDITOR 'Play without*auditor'   'AUDITOR '''
 GSWSTART 'Start the clock'  'ACT 0'
 GSACTING 'Stop the clock'  'TIMERADJ 0;0;'''
 GSPAUSE 'Start the clock'  'TIMERADJ 1;0;'''
@@ -441,11 +458,13 @@ GSCONFIRM 'Everybody*agrees*score'   'COMMIT 0'
 GSCHANGE 'Yes, proceed' 'PROCEED 0'
 GSCHANGEWACTOR 'I don''t need*a scorer'   'ACTOR '';1;0'
 GSCHANGEWSCORER ''    ''
+GSCHANGEWAUDITOR 'Play without*auditor'   'AUDITOR 0$a.'
 GSCHANGEWSTART 'Start the clock'  'ACT 0'
 )
 buttoncaptions1 =: (<@;)`(<@(,&a:))`(<@(,&a:))"1 ".&.> |: ;:@(LF&(('*'&(I.@:=)@])}));._2 (0 : 0)
 GSWACTOR 'I will play*but I need*a scorer' 'ACTOR '';1;1'
 GSWSCORER 'I will score'  'SCORER '';1'
+GSWAUDITOR 'I will audit'  'AUDITOR '''
 GSWSTART 'Undo'  'SCORER '';0'
 GSACTING 'Undo last score' 'PREVWORD 0'
 GSPAUSE 'Undo last score'  'PREVWORD 0'
@@ -454,6 +473,7 @@ GSCONFIRM 'See all*the words'   'S'
 GSCHANGE '' ''
 GSCHANGEWACTOR 'I need*a scorer'   'ACTOR '';1;1'
 GSCHANGEWSCORER 'I will score'  'SCORER '';1'
+GSCHANGEWAUDITOR 'I will audit'  'AUDITOR '''
 GSCHANGEWSTART 'Undo!  I don''t*want to score'  'SCORER '';0'
 )
 
@@ -514,13 +534,15 @@ wd 'set fmbagstatus text *', ": Gbagstatus
 
 handGturnwordlist =: 3 : 0
 if. Gstate = GSCONFIRM do.   NB. display words in CONFIRM state, where they might be changed by a SCOREMOD without changing state
+  NB. See who is away
+  awaystg =.; ('BRB: ';'Away: ') (*@#@] # '<br>' ,~ [ , ])&.> Gawaystatus
   NB. Extract the words that are being retired
   rwords =. (#~ 1 <: (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words.  wordqueue must be empty
   if. #rwords do.
     rwords =. <@(1&{:: , ('';' (late)';' (foul)') {::~ (1 1;0 1) i. 2&{)"1 rwords  NB. word text, with late words indicated
-    wd 'set fmgeneral text *' , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'Words: ', _2 }. ; ,&', '&.> rwords
+    wd 'set fmgeneral text *' , awaystg , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'Words: ', _2 }. ; ,&', '&.> rwords
   else.
-    wd 'set fmgeneral text *' , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'No words were scored.'
+    wd 'set fmgeneral text *' , awaystg . ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'No words were scored.'
   end.
 end.
 ''
@@ -552,8 +574,8 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
       fwwds =. fwwds ,&.> scoretag
     else. fwwds =. 0$a:
     end.
-    NB. Select words to show, format as list.  Always leave space for one word from turnwordlist, possibly empty
-    showwds =. ({: ftwds) , fwwds
+    NB. Select words to show, format as list.  During turn leave space for one word from turnwordlist, possibly empty; when settling show all
+    showwds =. ({:^:(Gstate=GSSETTLE) ftwds) , fwwds
     showwds =. ('<ul>' , ,&'</ul>') ;@:(('<li>' , ,&'</li>')&.>) showwds  NB. Make each word a list element, and the whole thing a list
     instr =. ((GSACTING,GSPAUSE,GSSETTLE) i. Gstate) {:: APSinstructions
     wd 'set fmgeneral text *' , instr , showwds
@@ -567,8 +589,8 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
         dqtext =. 'DQ: '&,^:(*@#) ;:^:_1 dqplrs -. ((-. Gteamup) {:: Gteams) , <Gactor 
       else. dqtext =. ''
       end.
-      NB. Give the scorer a summary of the scoring actions he has performed this round
-      if. Glogin -: Gscorer do.
+      NB. Give the scorer/auditor a summary of the scoring actions performed this round
+      if. (<Glogin) e. Gscorer;Gauditor do.
         if. #twds =. (<Groundno) (] #~ (= {."1)) Gturnwordlist do.
           ftwds =. 1 {"1 twds
           scoretype =. (0 _1;_1 0;1 1;0 0;0 1;0 2) i. 2 {"1 twds
@@ -583,7 +605,7 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
       wd 'set fmgeneral text *' , dqtext, showwds
       if. 0=#dqtext do. wd 'set fmgeneral scroll max' end.
     else.
-      wd 'set fmgeneral scroll max;set fmgeneral text *' , (*Gtimedisp) {:: 'Turn is over';'Scoring break, turn will continue'  NB. Reset scroll after scoring
+      wd 'set fmgeneral scroll min;set fmgeneral text *' , (*Gtimedisp) {:: 'Turn is over';'Scoring break, turn will continue'  NB. Reset scroll after scoring
     end.
   end.
 end.
@@ -669,13 +691,15 @@ end.
 i. 0 0
 )
 formbon_fmawaybrb_button =: 3 : 0
-wd 'set fmawaygone value 0'
-backcmd 'AWAYSTATUS ''' , Glogin , ''';' , ": fmawaybrb  NB. 0=here, 1=brb, 2=away
+awaygone =: 0 [ awaybrb =: -. awaybrb
+wd 'set fmawaygone value 0;set fmawaybrb ' , ": awaybrb
+backcmd 'AWAYSTATUS ''' , Glogin , ''';' , ": awaybrb  NB. 0=here, 1=brb, 2=away
 i. 0 0
 )
 formbon_fmawaygone_button =: 3 : 0
-wd 'set fmawaybrb value 0'
-backcmd 'AWAYSTATUS ''' , Glogin , ''';' , 2 * ": fmawaybrb
+awaybrb =: 0 [ awaygone =: -. awaygone
+wd 'set fmawaybrb value 0;set fmawaygone ' , ": awaygone
+backcmd 'AWAYSTATUS ''' , Glogin , ''';' , ": 2 * awaygone  NB. 0=here, 1=brb, 2=away
 i. 0 0
 )
 formbon_fmtimerp5_button =: 3 : 0
@@ -831,14 +855,13 @@ if. #dispwds =. Gturnwordlist , Gwordqueue do.
   wd FORMSETTLE rplc '%2';buttons
   NB. Based on the scoring (if any), create the form, for the scoring and the words
   wdbutt =. BUTTdisps i. (<rdx;2) { dispwds
-  if. #wdbutt =. (#~  6 ~: {."1) wdbutt ,. rdx do. wd ('set fmwdrb',":@],'c',' value 1' ,~ ":@[)/"1 wdbutt end.
+  if. #wdbutt =. (#~  6 ~: {."1) wdbutt ,. rdx do. wd ;@:(('set fmwdrb',":@],'c',' value 1;' ,~ ":@[)/"1) wdbutt end.
   rdx ([: wd 'set fmwdst' , ":@[ , ' text *' , ])&>  (<rdx;1) { dispwds
   NB. Display the form
   wd 'pshow'
 end.
 )
 formsettle_ok_button =: 3 : 0
-wdq  =: wd 'q'
 NB. Extract the data from the form
 if. #checks =. (#~ (<,'1') = {:"1) wdq do.
   buttsels =. (([: _9&". 6 }. _2 }. ]) , _9&".@{:)@> (#~  ('fmwdrb' -: 6&{.)@>) {."1 checks
