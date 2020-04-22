@@ -415,7 +415,8 @@ case. GSLOGINOK do. text =. 'OK to login'
 case. GSAUTH do. text =. 'Waiting for authorization'
 case. GSWORDS do. text =. 'Players are entering words'
 case. GSWACTOR do.
-  wd 'set fmgeneral text *Next up: ' , ((Gteamup;0) {:: Gteams) , ' then ' , ((Gteamup;1) {:: Gteams)
+  awaystg =. , ; ('BRB: ';'Away: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (-. Gteamup) { Gteams   NB. Away players for the acting team
+  wd 'set fmgeneral text *Next up: ' , ((Gteamup;0) {:: Gteams) , ' then ' , ((Gteamup;1) {:: Gteams) , awaystg
   text =. 'Need player for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
 case. GSWSCORER do. text =. 'Need someone to score for ' , Gactor
 case. GSWAUDITOR do. text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
