@@ -575,7 +575,7 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
     else. fwwds =. 0$a:
     end.
     NB. Select words to show, format as list.  During turn leave space for one word from turnwordlist, possibly empty; when settling show all
-    showwds =. ({:^:(Gstate=GSSETTLE) ftwds) , fwwds
+    showwds =. ({:^:(Gstate~:GSSETTLE) ftwds) , fwwds
     showwds =. ('<ul>' , ,&'</ul>') ;@:(('<li>' , ,&'</li>')&.>) showwds  NB. Make each word a list element, and the whole thing a list
     instr =. ((GSACTING,GSPAUSE,GSSETTLE) i. Gstate) {:: APSinstructions
     wd 'set fmgeneral text *' , instr , showwds
