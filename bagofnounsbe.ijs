@@ -65,6 +65,7 @@ rc =. sdbind_jsocket_ lsk ; AF_INET_jsocket_ ; '' ; 8090  NB. listen on port 809
 if. 0~:rc do. ('Error ',(":rc),'binding to 8090') 13!:8 (4) end.
 NB. obsolete NB. Wait for hello
 NB. obsolete sockloop lsk;tourn;password
+smoutput'Hello' NB. scaf
 wd 'timer 50'
 waitstate =: 0   NB. no waitmsgs yet
 sk =: 0  NB. No FE connection
