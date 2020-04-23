@@ -2,6 +2,7 @@ require 'socket'
 require 'strings'
 require'format/printf'
 sdcleanup_jsocket_ =: 3 : '0[(sdclose ::0:"0@[ shutdownJ@(;&2)"0)^:(*@#)SOCKETS_jsocket_'
+SWREV =: 100  NB. Current EC level
 NB. Game states
 GSHELLO =: 0  NB. Initial login at station: clear username, clear incrhwmk
 GSLOGINOK =: 1  NB. OK to log in
@@ -216,6 +217,7 @@ if. sk e. 2 {:: sdselect_jsocket_ '';sk;'';y do.
   Gstate =: GSHELLO  NB. initial state to help ignoring one-shots
   backcmd 'HELLO ', ": {.!.0 ". 'cleargame'
   cleargame=:0  NB. Don't do it again accidentally
+  backcmd 'SWREV ' , ": SWREV  NB. Indicate our level
   0
 else.
   backdied 0  NB. Indicate no connection
@@ -303,7 +305,7 @@ end.
 )
 
 NB. Order of processing state info
-statepri =: (;: 'Gteamnames Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordundook Gbagstatus Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
+statepri =: (;: 'Gswrev Gteamnames Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordundook Gbagstatus Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
 NB. Process the command queue, which is a list of boxes.  Each box contains
 NB. the 5!:5 of a table of state information, as
 NB. infotype ; value
@@ -325,6 +327,14 @@ NB. Start with the lowest modified state, and then all handlers till the end.  M
 wd 'psel formbon'
 for_h. statepri (<./@:i. }. [) {."1 cmds do. ('hand',>h)~ '' end.
 ''
+)
+
+handGswrev =: 3 : 0
+if. Gswrev > SWREV do.
+  wd 'mb info mb_ok "Update your software" *Your code is out of date.  Go to Tools|Package Manager to update it, then restart Bag of Nouns'
+  backdied''
+  wd :: 0: 'psel formbon;pclose'
+end.
 )
 
 handGteamnames =: 3 : 0
@@ -543,7 +553,7 @@ if. Gstate = GSCONFIRM do.   NB. display words in CONFIRM state, where they migh
     rwords =. <@(1&{:: , ('';' (late)';' (foul)') {::~ (1 1;0 1) i. 2&{)"1 rwords  NB. word text, with late words indicated
     wd 'set fmgeneral text *' , awaystg , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'Words: ', _2 }. ; ,&', '&.> rwords
   else.
-    wd 'set fmgeneral text *' , awaystg . ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'No words were scored.'
+    wd 'set fmgeneral text *' , awaystg , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'No words were scored.'
   end.
 end.
 ''

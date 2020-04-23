@@ -63,13 +63,17 @@ sdcleanup_jsocket_''  NB. debugging
 lsk =: 1 {:: sdsocket_jsocket_ ''  NB. listening socket
 rc =. sdbind_jsocket_ lsk ; AF_INET_jsocket_ ; '' ; 8090  NB. listen on port 8090 
 if. 0~:rc do. ('Error ',(":rc),'binding to 8090') 13!:8 (4) end.
-NB. Wait for hello
-sockloop lsk;tourn;password
+NB. obsolete NB. Wait for hello
+NB. obsolete sockloop lsk;tourn;password
+wd 'timer 50'
+waitstate =: 0   NB. no waitmsgs yet
+sk =: 0  NB. No FE connection
+''
 )
 
 NB. Return non0 if error
 sockpoll =: 3 : 0
-'qbm sk tourn password' =. y
+NB. obsolete   'qbm sk tourn password' =. y
 feconnlost=.0
 NB. Wait for a pulse from the front end
 if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.  NB. allow long time for dialog box
@@ -106,8 +110,7 @@ while. do.
   if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.5 break. end.
 end.
 if. feconnlost do. feconnlost [ wd 'timer 0' [ smoutput 'fe connection lost'  return. end.
-NB. perform pre-sync command processing.  First, remember state before this command
-gbls =. ".&.> gblifnames  NB. current values
+NB. perform pre-sync command processing.
 if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
 senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('INCR "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
 NB. Create a connection to the server and send all the data in an INCR command
@@ -121,7 +124,7 @@ for_dly. 1 1 300 # 1000 2000 3000 do.
   sdclose_jsocket_ ssk
   smoutput 'Error ' , (":rc) , ' connecting to server'
   qbm2 =. }. sdgethostbyname_jsocket_ 'www.quizbowlmanager.com'  NB. In case the address changed
-  if. _1 {:: qbm2 -.@-: '255.255.255.255' do. qbm =. qbm2 end.  NB. Save new address, if it is valid
+  if. _1 {:: qbm2 -.@-: '255.255.255.255' do. qbm =: qbm2 end.  NB. Save new address, if it is valid
   ssk =. 0
 end.
 if. ssk=0 do.  NB. uncorrectable server error
@@ -164,6 +167,7 @@ if. #data do. qprintf'data 'end.
     incrhwmk =: (0 >.incrhwmk) + #data  NB.Since we processed it, skip over this data in the future
     postsync data
     NB. Send new state info to the front end
+    gbls =. ".&.> gblifnames  NB. current values
     chgmsk =. gbls ~: Ggbls  NB. see what's different
     diffs =. (chgmsk # gblifnames) ,. chgmsk # gbls
     Ggbls =: gbls  NB. save current values to be old state next time
@@ -193,40 +197,47 @@ NB. If we did not read a response, quietly discard it
 NB. Loop forever reading/writing sockets. y is the socket we are listening on.
 NB. We wait for the game to connect.  If it goes away, we wait again
 sockloop =: 3 : 0
-'lsk tourn password' =. y
+NB. obsolete 'lsk tourn password' =. y
 while. do.   NB. loop here forever
-  smoutput 'Waiting for connection'
+  if. waitstate=0 do. smoutput 'Waiting for connection from game display' end.
+  waitstate =: 1   NB. Indicate 
   incrhwmk =: 0  NB. where we are in the host log
-  qbm =. }. sdgethostbyname_jsocket_ 'www.quizbowlmanager.com'
+  qbm =: }. sdgethostbyname_jsocket_ 'www.quizbowlmanager.com'
   sdlisten_jsocket_ lsk,1
-  sdselect_jsocket_ lsk;'';'';6000000   NB. Wait till front-end attaches
-  rc =. sdaccept_jsocket_ lsk  NB. Create the clone
-  if. 0~:0{::rc do. ('Error ',(":0{::rc),'connecting to frontend') 13!:8 (4) end.
-  sk =. 1 {:: rc   NB. front-end socket number
-  NB. Main loop: read from frontend, INCR to the server, process the response
-if. 0 do.
-  while. do.
-    sockpoll qbm;sk;tourn;password
+  rc =. sdselect_jsocket_ lsk;'';'';0   NB. Wait till front-end attaches
+  if. lsk e. 1 {:: rc do.
+    rc =. sdaccept_jsocket_ lsk  NB. Create the clone
+    if. 0~:0{::rc do. ('Error ',(":0{::rc),'connecting to frontend') 13!:8 (4) end.
+    sk =: 1 {:: rc   NB. front-end socket number
+    waitstate =: 0  NB.  If we lose FE, give another message
+    NB. Main loop: read from frontend, INCR to the server, process the response
+    if. 0 do.
+      while. do.
+        sockpoll '' NB. obsolete qbm;sk;tourn;password
+      end.
+      NB. connection lost, close socket and rewait
+      sk =: 0 [ sdclose_jsocket_ sk
+    else.
+      NB. debug version using timer
+  NB. obsolete   timerpms =: qbm;sk;tourn;password
+      wd 'timer 50'
+    end.
+  else. sk =: 0
   end.
-  NB. connection lost, close socket and rewait
-  sdclose_jsocket_ sk
-else.
-  NB. debug version using timer
-  timerpms =: qbm;sk;tourn;password
-  wd 'timer 50'
-end.
 return.  NB. scaf
 end.
 )
 
 sys_timer =: 3 : 0
-try. rc =. sockpoll timerpms
-if. rc do.  NB. scaf
-  sdclose_jsocket_ 1{::timerpms  NB. close fe socket before we rewait
-  smoutput 'Error ' , (":rc) , ' on sockets'
-  wd 'timer 0'
-  sockloop lsk;2 3 { timerpms  NB. retry
-end.
+try.
+  if. 0 = sk do. sockloop''
+  else.
+    rc =. sockpoll ''
+    if. rc do.  NB. scaf
+      sk =: 0 [ sdclose_jsocket_ sk  NB. close fe socket before we rewait
+      smoutput 'Error ' , (":rc) , ' on sockets'
+    end.
+  end.
 catch.
 wd 'timer 0'
 smoutput 'error in timer'
@@ -245,7 +256,7 @@ Glogtext =: Glogtext , y , x
 ''
 )
 
-gblifnames =: ;:'Gstate Gscore Gdqlist Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin Gturnwordlist Gbuttonblink Gturnblink Gbagstatus Gteamnames Gauditor'
+gblifnames =: ;:'Gstate Gscore Gdqlist Gactor Gscorer Gteamup Gteams Gwordqueue Gwordundook Gtimedisp Groundno Groundtimes Gawaystatus Gwordstatus Glogtext Glogin Gturnwordlist Gbuttonblink Gturnblink Gbagstatus Gteamnames Gauditor Gswrev'
 
 NB. Initial settings for globals shared with FE
 initstate =: 3 : 0
@@ -275,6 +286,7 @@ Gturnblink =: 0
 Gbagstatus =: 0 0 0
 Gteamnames =: 2$a:  NB. empty team names
 Gauditor =: ''
+Gswrev =: 0
 NB.?lintsaveglobals
 )
 initstate''
@@ -349,6 +361,12 @@ postsync =: 3 : 0
 ". :: (addtolog@('Failed: '&,)) @('postyh'&,);._2 y -. CR   NB. run em all
 NB. Send the changed names
 i. 0 0
+)
+
+NB. eclevel
+postyhSWREV =: 3 : 0
+Gswrev =: Gswrev >. y
+''
 )
 
 postyhLOGINREQ =: 3 : 0
