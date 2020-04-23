@@ -85,8 +85,7 @@ cmdqueue =. 0$a:  NB. List of commands
 while. do.
   while. 4>#hdr do.
     'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
-    if. 0{::rc do. ('Error ',(":0{::rc),' reading from frontend') 13!:8 (4) end.
-    if. 0=#data do. feconnlost=.1 break. end.
+    if. (0~:rc) +. (0=#data) do. feconnlost=.1 break. end.
     hdr =. hdr , data
     if. 4=#hdr do. break. end.
     if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.4 break. end.
@@ -199,6 +198,7 @@ NB. We wait for the game to connect.  If it goes away, we wait again
 sockloop =: 3 : 0
 NB. obsolete 'lsk tourn password' =. y
 while. do.   NB. loop here forever
+  sk =: 0  NB. no socket yet
   if. waitstate=0 do. smoutput 'Waiting for connection from game display' end.
   waitstate =: 1   NB. Indicate 
   incrhwmk =: 0  NB. where we are in the host log
@@ -206,23 +206,23 @@ while. do.   NB. loop here forever
   sdlisten_jsocket_ lsk,1
   rc =. sdselect_jsocket_ lsk;'';'';0   NB. Wait till front-end attaches
   if. lsk e. 1 {:: rc do.
-    rc =. sdaccept_jsocket_ lsk  NB. Create the clone
-    if. 0~:0{::rc do. ('Error ',(":0{::rc),'connecting to frontend') 13!:8 (4) end.
-    sk =: 1 {:: rc   NB. front-end socket number
     waitstate =: 0  NB.  If we lose FE, give another message
-    NB. Main loop: read from frontend, INCR to the server, process the response
-    if. 0 do.
-      while. do.
-        sockpoll '' NB. obsolete qbm;sk;tourn;password
+    rc =. sdaccept_jsocket_ lsk  NB. Create the clone
+    if. 0=0{::rc do.
+      sk =: 1 {:: rc   NB. front-end socket number
+      NB. Main loop: read from frontend, INCR to the server, process the response
+      if. 0 do.
+        while. do.
+          sockpoll '' NB. obsolete qbm;sk;tourn;password
+        end.
+        NB. connection lost, close socket and rewait
+        sk =: 0 [ sdclose_jsocket_ sk
+      else.
+        NB. debug version using timer
+    NB. obsolete   timerpms =: qbm;sk;tourn;password
+        wd 'timer 50'
       end.
-      NB. connection lost, close socket and rewait
-      sk =: 0 [ sdclose_jsocket_ sk
-    else.
-      NB. debug version using timer
-  NB. obsolete   timerpms =: qbm;sk;tourn;password
-      wd 'timer 50'
     end.
-  else. sk =: 0
   end.
 return.  NB. scaf
 end.
