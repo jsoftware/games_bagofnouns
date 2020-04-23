@@ -2,9 +2,7 @@ require 'socket'
 require 'strings'
 require 'pacman'
 sdcleanup_jsocket_ =: 3 : '0[(sdclose ::0:"0@[ shutdownJ@(;&2)"0)^:(*@#)SOCKETS_jsocket_'
-upr =. 'upgrade' jpkg 'games/bagofnouns'  NB. Get any updates
-smoutput'upr'
-smoutput upr
+'upgrade' jpkg 'games/bagofnouns'  NB. Get any updates
 3 : 0 ''
 sdcleanup_jsocket_''  NB. debugging
 lsk =. 1 {:: sdsocket_jsocket_ ''  NB. listening socket

@@ -109,7 +109,7 @@ while. do.
   hdr =. hlen {. readdata  NB. transfer the length
   if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.5 break. end.
 end.
-if. feconnlost do. feconnlost [ wd 'timer 0' [ smoutput 'fe connection lost'  return. end.
+if. feconnlost do. feconnlost [ smoutput 'fe connection lost'  return. end.
 NB. perform pre-sync command processing.
 if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
 senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('INCR "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
@@ -237,6 +237,7 @@ try.
     if. rc do.  NB. scaf
       sk =: 0 [ sdclose_jsocket_ sk  NB. close fe socket before we rewait
       smoutput 'Error ' , (":rc) , ' on sockets'
+      waitstate =: 0  NB. Give another msg
     end.
   end.
 catch.
