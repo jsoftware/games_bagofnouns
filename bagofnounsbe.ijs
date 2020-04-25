@@ -162,7 +162,7 @@ if. #readdata do.
   'rc data' =. fileserv_decrsphdr_sockfileserver_ readdata
   NB. Process the response
   if. (rc=0) do.   NB. to handle login seq we must pass heartbeats through
-if. #data do. qprintf'data 'end.
+NB. obsolete if. #data do. qprintf'data 'end.
     incrhwmk =: (0 >.incrhwmk) + #data  NB.Since we processed it, skip over this data in the future
     postsync data
     NB. Send new state info to the front end
@@ -801,31 +801,6 @@ end.
 ''
 )
 
-
-getsk =: 3 : 0
-)
-sendcmd =: 4 : 0
-senddata =. x fileserv_addreqhdr_sockfileserver_ y
-rc =. sdconnect_jsocket_ sk;(}.qbm),<8090
-qprintf'rc '
-while. #senddata do.
-rc =. senddata sdsend_jsocket_ sk,0
-qprintf'rc '
-senddata =. (1{::rc) }. senddata
-recvdata =. ''
-end.
-for. i. 20 do.
-  rsockl =. 1 {:: sdselect_jsocket_ sk;'';sk;1000
-qprintf 'rsockl '
-  if. sk e. rsockl do.
-    'r data' =. sdrecv_jsocket_ sk,10000,0
-qprintf'r data '
-    if. 0=#data do. break. end.
-    recvdata =. recvdata , data
-  end.
-end.
-recvdata
-)
 0 : 0
 (<'1111111') sendcmd 'INCR "t1000" "bonlog" "0"',CRLF,'a' [ getsk''
 )
