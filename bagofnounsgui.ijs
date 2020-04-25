@@ -344,7 +344,7 @@ wd '01' ('set fmtmname',[,' text *',])&> Gteamnames
 
 NB. The handlers, in priority order.  They all return empty
 handGlogin =: 3 : 0
-loggedin =: 3 < #Glogin
+loggedin =: 3 <: #Glogin
 if. Glogin -: '*' do.
   wd 'set fmloggedin text *Login in progress...'
 elseif. loggedin do.
@@ -546,7 +546,7 @@ wd 'set fmbagstatus text *', ": Gbagstatus
 handGturnwordlist =: 3 : 0
 if. Gstate = GSCONFIRM do.   NB. display words in CONFIRM state, where they might be changed by a SCOREMOD without changing state
   NB. See who is away
-  awaystg =.; ('BRB: ';'Away: ') (*@#@] # '<br>' ,~ [ , ])&.> Gawaystatus
+  awaystg =.; ('BRB: ';'Away: ') (*@#@] # '<br>' ,~ [ , ;:^:_1@])&.> Gawaystatus
   NB. Extract the words that are being retired
   rwords =. (#~ 1 <: (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words.  wordqueue must be empty
   if. #rwords do.
