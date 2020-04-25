@@ -65,7 +65,6 @@ rc =. sdbind_jsocket_ lsk ; AF_INET_jsocket_ ; '' ; 8090  NB. listen on port 809
 if. 0~:rc do. ('Error ',(":rc),'binding to 8090') 13!:8 (4) end.
 NB. obsolete NB. Wait for hello
 NB. obsolete sockloop lsk;tourn;password
-smoutput'Hello' NB. scaf
 wd 'timer 50'
 waitstate =: 0   NB. no waitmsgs yet
 sk =: 0  NB. No FE connection
@@ -111,7 +110,7 @@ while. do.
 end.
 if. feconnlost do. feconnlost [ smoutput 'fe connection lost'  return. end.
 NB. perform pre-sync command processing.
-if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
+NB. obsolete if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
 senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('INCR "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
 NB. Create a connection to the server and send all the data in an INCR command
 sendstarttime =. 6!:1''  NB. scaf
@@ -175,8 +174,8 @@ if. #data do. qprintf'data 'end.
     Gturnblink =: 0  NB. Also a one-shot
     NB. Return the changes; if none, return a 0-length heartbeat
     if. #diffs do.
-      nwdiffs =. (#~   (<'Gwordstatus') ~: {."1) diffs   NB. scaf
-      qprintf'nwdiffs '
+NB. obsolete       nwdiffs =. (#~   (<'Gwordstatus') ~: {."1) diffs   NB. scaf
+NB. obsolete       qprintf'nwdiffs '
       chg =. 5!:5 <'diffs'  NB. Get data to send
     else. chg=.''  NB. if no diffs, send heartbeat
     end.
@@ -758,7 +757,7 @@ postyhSCOREADJ =: 3 : 0
 NB. Accept during SETTLE or CONFIRM only
 if. Gstate e. GSSETTLE,GSCONFIRM do.
   Gscore =: (incr + team { Gscore) team} Gscore
-  if. *@# name do. addtolog '<font color=red>' , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' points' , ((incr>0){::' from ';' to ') , 'team ' , (":team) , '</font>' end.
+  if. *@# name do. addtolog '<font color=red>' , name , ((incr>0){::' took away ';' added ') , (":|incr) , ' points' , ((incr>0){::' from ';' to ') , (team {:: Gteamnames) , '</font>' end.
 end.
 ''
 )

@@ -2,7 +2,7 @@ require 'socket'
 require 'strings'
 require'format/printf'
 sdcleanup_jsocket_ =: 3 : '0[(sdclose ::0:"0@[ shutdownJ@(;&2)"0)^:(*@#)SOCKETS_jsocket_'
-SWREV =: 100  NB. Current EC level
+SWREV =: 101  NB. Current EC level
 NB. Game states
 GSHELLO =: 0  NB. Initial login at station: clear username, clear incrhwmk
 GSLOGINOK =: 1  NB. OK to log in
@@ -110,7 +110,7 @@ menupopz;
 bin g;
 grid shape 1 2;
 grid colwidth 0 50; grid colwidth 1 20;
-grid colstretch 0 5; grid colstretch 1 1;
+grid colstretch 0 5; grid colstretch 1 2;
  rem left side: the display;
  bin g;
  grid shape 6 1;
@@ -119,51 +119,51 @@ grid colstretch 0 5; grid colstretch 1 1;
   rem top row: scores & login;
   bin h;
    bin h;
-    bin s1;cc fmscoreadj0 edit center;set fmscoreadj0 inputmask #d;set fmscoreadj0 wh 20 20;bin s1;
+    bin s1;cc fmscoreadj0 edit center;set fmscoreadj0 wh 20 20;bin s1;
     bin v;
-     cc fmtmname0 static center;set fmtmname0 minwh 20 20;set fmtmname0 sizepolicy expanding;set fmtmname0 font "Courier New" 12 bold;
-     cc fmscore0 static center;set fmscore0 minwh 20 20;set fmscore0 sizepolicy expanding;set fmscore0 font "Courier New" 64 bold;
+     cc fmtmname0 static center;set fmtmname0 minwh 20 20;set fmtmname0 sizepolicy expanding;
+     cc fmscore0 static center;set fmscore0 minwh 20 20;set fmscore0 sizepolicy expanding;
     bin z;
    bin z;
    bin s;
    bin v;
-     cc fmslowconn static center;set fmslowconn minwh 80 30;set fmslowconn sizepolicy expanding fixed;set fmslowconn font "Courier New" 24 bold;
+     cc fmslowconn static center;set fmslowconn minwh 80 30;set fmslowconn sizepolicy expanding fixed;
      cc fmlogin combobox;set fmlogin minwh 80 20;;set fmlogin sizepolicy expanding fixed;
-     cc fmloggedin static center;set fmloggedin minwh 80 30;set fmloggedin sizepolicy expanding fixed;set fmloggedin font "Courier New" 10;
+     cc fmloggedin static center;set fmloggedin minwh 80 30;set fmloggedin sizepolicy expanding fixed;
    bin z;
    bin s;
    bin h;
     bin v;
-     cc fmtmname1 static center;set fmtmname1 minwh 20 20;set fmtmname1 sizepolicy expanding;set fmtmname1 font "Courier New" 12 bold;
-     cc fmscore1 static center;set fmscore1 minwh 20 20;set fmscore1 sizepolicy expanding;set fmscore1 font "Courier New" 64 bold;
+     cc fmtmname1 static center;set fmtmname1 minwh 20 20;set fmtmname1 sizepolicy expanding;
+     cc fmscore1 static center;set fmscore1 minwh 20 20;set fmscore1 sizepolicy expanding;
     bin z;
-    bin s1;cc fmscoreadj1 edit center;set fmscoreadj1 inputmask #d;set fmscoreadj1 wh 20 20;bin s1;
+    bin s1;cc fmscoreadj1 edit center;set fmscoreadj1 wh 20 20;bin s1;
    bin z;
   bin z;
   rem row 2: progress bar;
   cc fmprogress progressbar 0 60 60;set fmprogress minwh 50 10;set fmprogress sizepolicy ignored fixed;
   rem row 3: general display;
-  cc fmgeneral edith;set fmgeneral edit 0;set fmgeneral sizepolicy expanding;set fmgeneral font "Courier New" 32 bold;
+  cc fmgeneral edith;set fmgeneral edit 0;set fmgeneral sizepolicy expanding;
   rem row 4: move to the next word;
   bin h;
-   cc fmretire4 button;set fmretire4 sizepolicy expanding;set fmretire4 font "Courier New" 24;
+   cc fmretire4 button;set fmretire4 sizepolicy expanding;
    bin s;
-   cc fmretire3 button;set fmretire3 sizepolicy expanding;set fmretire3 font "Courier New" 24;set fmretire3 text "Time Expired";
+   cc fmretire3 button;set fmretire3 sizepolicy expanding;set fmretire3 text "Time Expired";
    bin s;
-   cc fmretire0 button;set fmretire0 sizepolicy expanding;set fmretire0 font "Courier New" 24;set fmretire0 text "Don't Know It"; 
+   cc fmretire0 button;set fmretire0 sizepolicy expanding;set fmretire0 text "Don't Know It"; 
    bin s;
-   cc fmretire1 button;set fmretire1 sizepolicy expanding;set fmretire1 font "Courier New" 24;set fmretire1 text "Pass";
+   cc fmretire1 button;set fmretire1 sizepolicy expanding;set fmretire1 text "Pass";
    bin s;
    cc fmretire2 button;set fmretire2 sizepolicy expanding;set fmretire2 font "Courier New" 24;set fmretire2 text "Got It";
    bin z;
   rem row 5: general purpose buttons;
   bin h;
-   cc fmsieze0 button;set fmsieze0 sizepolicy expanding;set fmsieze0 font "Courier New" 24;set fmsieze0 text "";
-   cc fmbagstatus static center;set fmbagstatus font "Courier New" 24;set fmbagstatus text "";
+   cc fmsieze0 button;set fmsieze0 sizepolicy expanding;set fmsieze0 text "";
+   cc fmbagstatus static center;set fmbagstatus text "";
    cc fmsieze1 button;set fmsieze1 sizepolicy expanding;set fmsieze1 font "Courier New" 24;set fmsieze1 text "";
   bin z;
   rem row 6: status line;
-  cc fmstatus editm readonly;set fmstatus sizepolicy preferred;set fmstatus font "Courier New" 32 bold;
+  cc fmstatus editm readonly;set fmstatus sizepolicy preferred;
  bin z;
  rem right side: event log;
  cc fmlog edith;set fmlog wrap;set fmlog sizepolicy expanding;
@@ -193,18 +193,43 @@ NB.?lintsaveglobals
 ''
 )
 
+NB. x is desired pointsize when logperinch=72
+setfont =: 4 : 0
+pts =. 8 >. <. <.@(0.5&+)&.(%&4) x * 72 % {: screenpx
+wd y rplc '*';":pts
+''
+)
+
 NB. Called from time to time
 NB. y is forcefrac
 winresize =: 3 : 0
 forcefrac =. y
 NB. Remember screensize
 oldwh =: screenwh
-screenwh =: 2 3 { 0 ". wd 'psel formbon;qscreen'
+'screenpx screenwh' =: (4 5,:2 3) { 0 ". wd 'psel formbon;qscreen'
 NB. if forcefrac, set frac to 90% (keep width unchanged)
 if. forcefrac do. screenfrac =: 0.5 0.9 end.
 NB.?lintonly  screenfrac =: 0.5 0.9
 NB. if screensize changes, set wh to same proportion of screen as before
-if. screenwh -.@-: oldwh do. wd 'pmove ' , ": <. (,~ screenwh) * (-:@:-. , ]) screenfrac end.
+if. screenwh -.@-: oldwh do.
+  wd 'pmove ' , ": <. (,~ screenwh) * (-:@:-. , ]) screenfrac
+  NB. Set the font size based on screen size
+  12 setfont 'set fmtmname0 font "Courier New" * bold'
+  64 setfont 'set fmscore0 font "Courier New" * bold'
+  24 setfont 'set fmslowconn font "Courier New" * bold'
+  10 setfont 'set fmloggedin font "Courier New" *'
+  12 setfont 'set fmtmname1 font "Courier New" * bold'
+  64 setfont 'set fmscore1 font "Courier New" * bold'
+  32 setfont 'set fmgeneral font "Courier New" * bold'
+  24 setfont 'set fmretire4 font "Courier New" *'
+  24 setfont 'set fmretire3 font "Courier New" *'
+  24 setfont 'set fmretire0 font "Courier New" *'
+  24 setfont 'set fmretire1 font "Courier New" *'
+  24 setfont 'set fmsieze0 font "Courier New" *'
+  24 setfont 'set fmbagstatus font "Courier New" *'
+  32 setfont 'set fmstatus font "Courier New" * bold'
+  10 setfont 'set fmlog font "Arial" *'
+end.
 NB. remember the proportion
 screenfrac =: (2 3 { 0 ". wd 'qform') % screenwh
 )
@@ -276,7 +301,7 @@ if. sk do.
       end.
       hlen =. _2 (3!:4) hdr   NB. Number of bytes to read
       if. 0=hlen do. break. end.  NB. 0-length message is a heartbeat, skip it
-smoutput'data from BE '  NB. scaf
+NB. obsolete smoutput'data from BE '  NB. scaf
       readdata =. ''
       while. do.
         'rc data' =. sdrecv_jsocket_ sk,(4+hlen),00   NB. Read the data
@@ -312,7 +337,7 @@ i. 0 0
 
 NB. Send the command in y, prefixed by length
 backcmd =: 3 : 0
-if. #y do. smoutput 'backcmd: ' , y end. NB. scaf
+NB. obsolete if. #y do. smoutput 'backcmd: ' , y end. NB. scaf
 NB. Skip this is background is dead
 if. sk do.
   senddata =. (2 (3!:4) #y) , y   NB. prefix the data with 4-byte length
@@ -336,7 +361,6 @@ NB. we drive handlers for all the changed values.  We visit the handlers in a pr
 NB. We collect all the changed values for all commands before we drive any of the handlers
 NB. y cannot be empty
 proccmds =: 3 : 0
-qprintf'y '
 initing =. Gstate=GSHELLO  NB. set if this is the very first call
 NB. Turn each input into a boxed table of name ; value
 NB. Run the tables together, keep the latest of each
@@ -393,7 +417,7 @@ if. Gturnblink do.
     wd 'msgs'
     6!:3 (0.06)
   end.
-  wd 'set fmgeneral font "Courier New" 32 bold'  NB. Reset for normal use
+  32 setfont 'set fmgeneral font "Courier New" * bold'  NB. Reset for normal use
   Gturnblink =: 0  NB. It shouldn't come twice, but take no chances
 end.
 ''
@@ -656,10 +680,10 @@ end.
 handGbuttonblink =: 3 : 0
 NB. Turn off the blink in all states, to make sure it isn't left on
 if. Gbuttonblink -: '' do.
-  wd , 'p<set fmretire>q< font "Courier New" 24;>'  (8!:2) i. 5
+  24 setfont 'p<set fmretire>q< font "Courier New" *;>'  (8!:2) i. 5
 elseif. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) *. Glogin -.@-: Gscorer do.
   NB. Blink only in word-scoring states, and not on the scorer's screen to avoid distraction
-  wd  'p<set fmretire>q< font "Courier New" 32 bold;>' (8!:2) 0 1 2 3 4 4 {~ (_2 ]\ 0 _1  _1 0  1 1  0 0  0 1  0 2) i. Gbuttonblink
+  32 setfont 'p<set fmretire>q< font "Courier New" * bold;>' (8!:2) 0 1 2 3 4 4 {~ (_2 ]\ 0 _1  _1 0  1 1  0 0  0 1  0 2) i. Gbuttonblink
 end.
 ''
 )
@@ -705,13 +729,28 @@ end.
 backcmd 'LOGIN ''',fmlogin,''''
 i. 0 0
 )
+
+NB. Return adjustment, 0 if none or invalid
+auditscoreadj =: 3 : 0
+sgn =. ('-' = {. y) { 1 _1
+y =. (({.y) e. '+-') }. y  NB. discard sign
+if. 1 ~: #y do. y=. 10
+else. y =. '0123456789' i. y
+end.
+if. y = 10 do.
+  wdmodal 'mb info mb_ok "Bad change" "Must be 1 digit with optional sign"'
+  0
+else.
+  y * sgn
+end.
+)
 formbon_fmscoreadj0_button =: 3 : 0
-adj =. ": adjn =. {.!.0 (0)".fmscoreadj0
+adj =. ": adjn =.  auditscoreadj fmscoreadj0
 if. adjn do. backcmd 'SCOREADJ 0;',adj,';''',Glogin,'''' end.
 i. 0 0
 )
 formbon_fmscoreadj1_button =: 3 : 0
-adj =. ": adjn =. {.!.0 (0)".fmscoreadj1
+adj =. ": adjn =.  auditscoreadj fmscoreadj1
 if. adjn do. backcmd 'SCOREADJ 1;',adj,';''',Glogin,'''' end.
 i. 0 0
 )
