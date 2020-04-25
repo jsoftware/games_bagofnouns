@@ -181,14 +181,34 @@ wd 'set fmretire0 text *Don''t',LF,'Know It'
 wd 'set fmretire2 text *Got',LF,'It'
 wd 'set fmretire3 text *Time',LF,'Expired'
 NB. We have to shadow the away buttons ourselves, since we can't query them
+screenwh =: ''  NB. 
 awaybrb =: awaygone =: 0
+winresize 1
 wd 'pshow'
 
 NB. Start a heartbeat
 nextheartbeat =: 6!:1''
 wd 'ptimer 50'
+NB.?lintsaveglobals
 ''
 )
+
+NB. Called from time to time
+NB. y is forcefrac
+winresize =: 3 : 0
+forcefrac =. y
+NB. Remember screensize
+oldwh =: screenwh
+screenwh =: 2 3 { 0 ". wd 'psel formbon;qscreen'
+NB. if forcefrac, set frac to 90% (keep width unchanged)
+if. forcefrac do. screenfrac =: 0.5 0.9 end.
+NB.?lintonly  screenfrac =: 0.5 0.9
+NB. if screensize changes, set wh to same proportion of screen as before
+if. screenwh -.@-: oldwh do. wd 'pmove ' , ": <. (,~ screenwh) * (-:@:-. , ]) screenfrac end.
+NB. remember the proportion
+screenfrac =: (2 3 { 0 ". wd 'qform') % screenwh
+)
+
 
 formbon_close =: 3 : 0
 wd 'ptimer 0;pclose'
@@ -229,6 +249,8 @@ end.
 heartbeatrcvtime =: _  NB. time previous heartbeat was received
 formbon_timer =: 3 : 0
 try.
+NB. Handle changes to screen size or form position
+winresize 0  
 if. sk=0 do.
   NB. No bg connection yet, or connection lost - establish one
   if. conntoback 4000 do.
