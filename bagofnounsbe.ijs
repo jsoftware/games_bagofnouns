@@ -68,6 +68,7 @@ NB. obsolete sockloop lsk;tourn;password
 wd 'timer 50'
 waitstate =: 0   NB. no waitmsgs yet
 sk =: 0  NB. No FE connection
+gamehistory =: ''  NB. total of entire log
 ''
 )
 
@@ -164,6 +165,7 @@ if. #readdata do.
   if. (rc=0) do.   NB. to handle login seq we must pass heartbeats through
 NB. obsolete if. #data do. qprintf'data 'end.
     incrhwmk =: (0 >.incrhwmk) + #data  NB.Since we processed it, skip over this data in the future
+gamehistory =: gamehistory , data
     postsync data
     NB. Send new state info to the front end
     gbls =. ".&.> gblifnames  NB. current values
@@ -640,9 +642,9 @@ end.
 postyhPREVWORD =: 3 : 0
 NB. If there is a word in the turnlist, and  we are acting or paused, or we are settling
 if. Gwordundook *. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) do.
-  NB. Move tail of turnwords to head of Gwordqueue, adding in the dq info
+  NB. Move tail of turnwords to head of Gwordqueue.  Remove the disposition, since we are removing the score.  It never happened.
   tailwd =. {: Gturnwordlist
-  Gwordqueue =: Gwordqueue ,~ tailwd
+  Gwordqueue =: Gwordqueue ,~ a: 2} tailwd
   Gturnwordlist =: }: Gturnwordlist
   Gwordundook =:  (<Groundno) e. 0 {"1 Gturnwordlist  NB. Allow undo if there's something to bring back
   NB. Undo the score
@@ -716,9 +718,7 @@ if. Gstate = GSCONFIRM do.
   rdscore =. +/ {."1 > 2 {"1 (<Groundno) (] #~ (= {."1)) Gturnwordlist
   addtolog Gactor , ': ' , (, '' 8!:2 rdscore) , ' pts ' , Groundno{::'(taboo)';'(charades)';'(password)'
   handledmsk =. 1 <: (2;1)&{::"1 Gturnwordlist  NB. words we finished
-  Gdqlist =: ((2 {."1 Gdqlist) -.@e. (handledmsk # 2 {."1 Gturnwordlist)) # Gdqlist  NB. Remove words we are showing now
-  htl =. handledmsk # Gturnwordlist  NB. the words we are showing everyone now
-NB. no more  Glogtext =: Glogtext , ((2;0)&{::"1 htl) ;@:(({::&('guessed late: ';'guessed: ')@[ , '<br>' ,~ ])&.>) 1 {"1 htl
+  Gdqlist =: ((2 {."1 Gdqlist) -.@e. (handledmsk # 2 {."1 Gturnwordlist)) # Gdqlist  NB. Remove dqs for words we are showing now
   Gturnwordlist =: (-. handledmsk) # Gturnwordlist  NB. The  words have now passed on
   if. Gtimedisp=0 do.
     NB. if no time left, handle end-of-turn
