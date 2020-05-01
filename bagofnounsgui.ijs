@@ -615,7 +615,7 @@ end.
 APSinstructions =: <;._2 (0 : 0)
 <small>Play in order.  Word turns from red to blue when scored:</small>
 Clock is stopped - wait
-<small>Words left over.  Handle the word in red (usually Time Expired), or use big buttons to review scores.</small>
+<small>You're not finished!  Handle the word in red (usually with Time Expired), or use big buttons to change scores.</small>
 )
 handGwordqueue =: 3 : 0
 if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
@@ -668,7 +668,7 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
       wd 'set fmgeneral text *' , dqtext, showwds
       if. 0=#dqtext do. wd 'set fmgeneral scroll max' end.
     else.
-      wd 'set fmgeneral scroll min;set fmgeneral text *' , (*Gtimedisp) {:: 'Turn is over';'Scoring break, turn will continue'  NB. Reset scroll after scoring
+      wd 'set fmgeneral scroll min;set fmgeneral text *' , (*Gtimedisp) {:: ('Turn is over.  Make sure ' , Gactor , ' is finishing the scoring.');'Scoring break, turn will continue'  NB. Reset scroll after scoring
     end.
   end.
 end.
