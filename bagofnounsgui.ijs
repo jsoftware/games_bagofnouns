@@ -458,9 +458,12 @@ fmsieze1         l0     l0     l0   l0      T     l1      la     AS    Sw    Sw 
 )
 
 getawaystg =: 3 : 0
-awaystg =. , ; ('BRB for acting team: ';'Away for acting team: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (-. Gteamup) { Gteams   NB. Away players for the acting team
-awaystg =. awaystg , , ; ('BRB for inactive team: ';'Away for inactive team: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (Gteamup) { Gteams   NB. Away players for the acting team
-if. #awaystg do. awaystg =. '<font color=blue><br>' , awaystg , '</font>' end.
+if. 2 = #Gteams do.
+  awaystg =. , ; ('BRB for acting team: ';'Away for acting team: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (-. Gteamup) { Gteams   NB. Away players for the acting team
+  awaystg =. awaystg , , ; ('BRB for inactive team: ';'Away for inactive team: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (Gteamup) { Gteams   NB. Away players for the acting team
+  if. #awaystg do. awaystg =. '<font color=blue><br>' , awaystg , '</font>' end.
+else. awaystg =. ''
+end.
 awaystg
 )
 
