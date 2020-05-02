@@ -470,6 +470,15 @@ NB. Set display for the variable buttons
 wd 'set fmsieze0 text *' , (1;((0{::buttoncaptions0) i. Gstate)) {:: buttoncaptions0
 wd 'set fmsieze1 text *' , (1;((0{::buttoncaptions1) i. Gstate)) {:: buttoncaptions1
 if. Gstate -.@e. GSSETTLE,GSCONFIRM do. wd 'set fmscoreadj0 text "";set fmscoreadj1 text ""' end.
+NB. Get the string to show the words from last turn
+if. #allretiredwds do.
+  rwords =. 'Words last turn: ', _2 }. ; ,&', '&.> <@(1&{:: , ('';' (late)';' (foul)') {::~ (1 1;0 1) i. 2&{)"1 allretiredwds  NB. word text, with late words indicated
+else. rwords =. 'No words retired last turn.'
+end.
+rwords . '<br><small>' , rwords , '</small>'
+NB. Get away-status string for the acting team
+awaystg =. , ; ('BRB for acting team: ';'Away for acting team: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (-. Gteamup) { Gteams   NB. Away players for the acting team
+awaystg =. awaystg , , ; ('BRB for inactive team: ';'Away for inactive team: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (Gteamup) { Gteams   NB. Away players for the acting team
 NB. Display the status line; if the general line is known from the state, do it too
 select. Gstate
 case. GSHELLO do. text =. 'Catching up'
@@ -477,14 +486,23 @@ case. GSLOGINOK do. text =. 'OK to login'
 case. GSAUTH do. text =. 'Waiting for authorization'
 case. GSWORDS do. text =. 'Players are entering words'
 case. GSWACTOR do.
-  awaystg =. , ; ('BRB: ';'Away: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (-. Gteamup) { Gteams   NB. Away players for the acting team
-  wd 'set fmgeneral text *Next up: ' , ((Gteamup;0) {:: Gteams) , ' then ' , ((Gteamup;1) {:: Gteams) , awaystg
+  wd 'set fmgeneral text *Next up for ',(Gteamup {:: Gteamnames),': ' , ((Gteamup;0) {:: Gteams) , ' then ' , ((Gteamup;1) {:: Gteams) , awaystg , rwords
   text =. 'Need player for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
-case. GSWSCORER do. text =. 'Need someone to score for ' , Gactor
-case. GSWAUDITOR do. text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
+case. GSWSCORER do.
+  wd 'set fmgeneral text *Click to score (',(((-.Gteamup);0) {:: Gteams),' is next in line).' , awaystg , rwords
+  text =. 'Need someone to score for ' , Gactor
+case. GSWAUDITOR do.
+  wd 'set fmgeneral text *Click to audit (',(((-.Gteamup);0) {:: Gteams),' is next in line).' , awaystg , rwords
+  text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
 case. GSWSTART do.
-  wd 'set fmgeneral text *' , (Glogin-:Gscorer) # 'You may fire when you are ready, Gridley.'
-  text =. Gscorer , ', start the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
+  if. Glogin-:Gscorer do.
+    if. Glogin-:Gactor do. wd 'set fmgeneral text *You may fire when you are ready, Gridley.' , awaystg
+    else. wd 'set fmgeneral text *Start the clock when told to.'
+    end.
+  elseif. Glogin-:Gactor do. wd 'set fmgeneral text *When you are ready, tell the scorer to start the clock.' , awaystg
+  else. wd 'set fmgeneral text *' , awaystg , rwords
+  end.
+  text =. Gscorer , ' starts the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
 case. GSACTING do. text =. Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password') , ' and ' , ((Gactor -.@-: Gscorer) # Gscorer , ' is ') , 'scoring'
 case. GSPAUSE do. text =. 'Clock stopped - ' , Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password')
 case. GSSETTLE do. text =. Gactor , ' is finalizing scores'
@@ -499,8 +517,14 @@ case. GSCHANGEWACTOR do.
 case. GSCHANGEWSCORER do. text =. 'Need someone to score for ' , Gactor
 case. GSCHANGEWAUDITOR do. text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
 case. GSCHANGEWSTART do.
-  wd 'set fmgeneral text *' , (Glogin-:Gscorer) # 'You may fire when you are ready, Gridley.'
-  text =. Gscorer , ', start the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
+  if. Glogin-:Gscorer do.
+    if. Glogin-:Gactor do. wd 'set fmgeneral text *You may fire when you are ready, Gridley.'
+    else. wd 'set fmgeneral text *Start the clock when told to.'
+    end.
+  elseif. Glogin-:Gactor do. wd 'set fmgeneral text *When you are ready, tell the scorer to start the clock.'
+  else. wd 'set fmgeneral text *'
+  end.
+  text =. Gscorer , ' starts the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
 case. GSGAMEOVER do. text =. 'Game Over'
 case. do. text =. ''
 end.
