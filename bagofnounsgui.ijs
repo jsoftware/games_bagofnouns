@@ -503,10 +503,12 @@ case. GSWACTOR do.
   wd 'set fmgeneral text *Next up for ',(Gteamup {:: Gteamnames),': ' , ((Gteamup;0) {:: Gteams) , ' then ' , ((Gteamup;1) {:: Gteams) , awaystg , rwords
   text =. 'Need player for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
 case. GSWSCORER do.
-  wd 'set fmgeneral text *Click to score (',(((-.Gteamup);0) {:: Gteams),' is next in line).' , awaystg , rwords
+  wd 'set fmgeneral text *Click to score (',(((-.Gteamup);0) {:: Gteams),' is up next for ',((-.Gteamup) {:: Gteamnames),').' , awaystg , rwords
   text =. 'Need someone to score for ' , Gactor
 case. GSWAUDITOR do.
-  wd 'set fmgeneral text *Click to audit (',(((-.Gteamup);0) {:: Gteams),' is next in line).' , awaystg , rwords
+  if. Glogin-:Gactor do. wd 'set fmgeneral text *If you''re sure you won''t make a mistake, you can play without an auditor.'
+  else. wd 'set fmgeneral text *Click to audit (',(((-.Gteamup);0) {:: Gteams),' is up next for ',((-.Gteamup) {:: Gteamnames),').' , awaystg , rwords
+  end.
   text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
 case. GSWSTART do.
   text =. Gscorer , ' starts the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
@@ -522,10 +524,11 @@ case. GSCHANGEWACTOR do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Do you want a scorer for the ',(Groundno {:: 'Taboo';'Charades';'Password'),' round?'
   text =. 'Does ' , Gactor , ' need a scorer for ',(Groundno {:: 'Taboo';'Charades';'Password'),'?' 
 case. GSCHANGEWSCORER do.
-  wd 'set fmgeneral text *Click to score (',(((-.Gteamup);0) {:: Gteams),' is next in line).' , awaystg
+  wd 'set fmgeneral text *Click to score (',(((-.Gteamup);0) {:: Gteams),' is up next for ',((-.Gteamup) {:: Gteamnames),').' , awaystg
   text =. 'Need someone to score for ' , Gactor
 case. GSCHANGEWAUDITOR do.
-  wd 'set fmgeneral text *Click to audit (',(((-.Gteamup);0) {:: Gteams),' is next in line).' , awaystg
+  if. Glogin-:Gactor do. wd 'set fmgeneral text *If you''re sure you won''t make a mistake, you can play without an auditor.'
+  else. wd 'set fmgeneral text *Click to audit (',(((-.Gteamup);0) {:: Gteams),' is up next for ',((-.Gteamup) {:: Gteamnames),').' , awaystg , rwords
   text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
 case. GSCHANGEWSTART do.
   if. Glogin-:Gscorer do.
