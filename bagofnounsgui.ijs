@@ -457,6 +457,22 @@ fmsieze0         l0     l0     l0   l1      T     A       A      S     l1     S 
 fmsieze1         l0     l0     l0   l0      T     l1      la     AS    Sw    Sw     Aw     Aw     l0       A          l1        la     AS         c0
 )
 
+getawaystg =: 3 : 0
+awaystg =. , ; ('BRB for acting team: ';'Away for acting team: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (-. Gteamup) { Gteams   NB. Away players for the acting team
+awaystg =. awaystg , , ; ('BRB for inactive team: ';'Away for inactive team: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (Gteamup) { Gteams   NB. Away players for the acting team
+if. #awaystg do. awaystg =. '<font color=blue><br>' , awaystg , '</font>' end.
+awaystg
+)
+
+getoldwords =: 3 : 0
+if. #Gturnwordlist do.
+  rwords =. 'Words last turn: ', _2 }. ; ,&', '&.> <@(1&{:: , ('';' (late)';' (foul)') {::~ (1 1;0 1) i. 2&{)"1 Gturnwordlist  NB. word text, with late words indicated
+  rwords =. '<br><br><small>' , rwords , '</small>'
+else. rwords =. ''
+end.
+rwords
+)
+
 handGstate =: 3 : 0
 NB. Set conditional enables
 'c0 c1 l0 l1' =. ":"0 , (1,loggedin) *./ 0 1
@@ -471,16 +487,9 @@ wd 'set fmsieze0 text *' , (1;((0{::buttoncaptions0) i. Gstate)) {:: buttoncapti
 wd 'set fmsieze1 text *' , (1;((0{::buttoncaptions1) i. Gstate)) {:: buttoncaptions1
 if. Gstate -.@e. GSSETTLE,GSCONFIRM do. wd 'set fmscoreadj0 text "";set fmscoreadj1 text ""' end.
 NB. Get the string to show the words from last turn, if we are in the states where that is meaningful
-if. Gstate e. GSWACTOR,GSWSCORER,GSWAUDITOR,GSWSTART do.
-  if. #Gturnwordlist do.
-    rwords =. 'Words last turn: ', _2 }. ; ,&', '&.> <@(1&{:: , ('';' (late)';' (foul)') {::~ (1 1;0 1) i. 2&{)"1 Gturnwordlist  NB. word text, with late words indicated
-  else. rwords =. 'No words retired last turn.'
-  end.
-  rwords =. '<br><small>' , rwords , '</small>'
-end.
-NB. Get away-status string for the acting team
-awaystg =. , ; ('BRB for acting team: ';'Away for acting team: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (-. Gteamup) { Gteams   NB. Away players for the acting team
-awaystg =. awaystg , , ; ('BRB for inactive team: ';'Away for inactive team: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (Gteamup) { Gteams   NB. Away players for the acting team
+if. Gstate e. GSWACTOR,GSWSCORER,GSWAUDITOR,GSWSTART do. rwords =. getoldwords'' end.
+NB. Get away-status string
+awaystg =. getawaystg''
 NB. Display the status line; if the general line is known from the state, do it too
 select. Gstate
 case. GSHELLO do. text =. 'Catching up'
@@ -497,13 +506,6 @@ case. GSWAUDITOR do.
   wd 'set fmgeneral text *Click to audit (',(((-.Gteamup);0) {:: Gteams),' is next in line).' , awaystg , rwords
   text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
 case. GSWSTART do.
-  if. Glogin-:Gscorer do.
-    if. Glogin-:Gactor do. wd 'set fmgeneral text *You may fire when you are ready, Gridley.' , awaystg
-    else. wd 'set fmgeneral text *Start the clock when told to.'
-    end.
-  elseif. Glogin-:Gactor do. wd 'set fmgeneral text *When you are ready, tell the scorer to start the clock.' , awaystg
-  else. wd 'set fmgeneral text *' , awaystg , rwords
-  end.
   text =. Gscorer , ' starts the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
 case. GSACTING do. text =. Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password') , ' and ' , ((Gactor -.@-: Gscorer) # Gscorer , ' is ') , 'scoring'
 case. GSPAUSE do. text =. 'Clock stopped - ' , Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password')
@@ -516,8 +518,12 @@ case. GSCHANGE do.
 case. GSCHANGEWACTOR do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Do you want a scorer for the ',(Groundno {:: 'Taboo';'Charades';'Password'),' round?'
   text =. 'Does ' , Gactor , ' need a scorer for ',(Groundno {:: 'Taboo';'Charades';'Password'),'?' 
-case. GSCHANGEWSCORER do. text =. 'Need someone to score for ' , Gactor
-case. GSCHANGEWAUDITOR do. text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
+case. GSCHANGEWSCORER do.
+  wd 'set fmgeneral text *Click to score (',(((-.Gteamup);0) {:: Gteams),' is next in line).' , awaystg , rwords
+  text =. 'Need someone to score for ' , Gactor
+case. GSCHANGEWAUDITOR do.
+  wd 'set fmgeneral text *Click to audit (',(((-.Gteamup);0) {:: Gteams),' is next in line).' , awaystg , rwords
+  text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
 case. GSCHANGEWSTART do.
   if. Glogin-:Gscorer do.
     if. Glogin-:Gactor do. wd 'set fmgeneral text *You may fire when you are ready, Gridley.'
@@ -591,7 +597,15 @@ handGteamup =: 3 : 0
 
 handGawaystatus =: 3 : 0
 if. Gstate=GSWSTART do.
-  wd 'set fmgeneral text *' , ; ('BRB: ';'Away: ') (*@#@] # '<br>' ,~ [ , ])&.> Gawaystatus ;:^:_1@-.&.> (-. Gteamup) { Gteams 
+  awaystg =. getawaystg''
+  rwords =. getoldwords''
+  if. Glogin-:Gscorer do.
+    if. Glogin-:Gactor do. wd 'set fmgeneral text *You may fire when you are ready, Gridley.' , awaystg
+    else. wd 'set fmgeneral text *Start the clock when told to.'
+    end.
+  elseif. Glogin-:Gactor do. wd 'set fmgeneral text *When you are ready, tell the scorer to start the clock.' , awaystg
+  else. wd 'set fmgeneral text *' , awaystg , rwords
+  end.
 end.
 wd 'set fmawaybrb value ' , ": loggedin *. (<Glogin) e. 0 {:: Gawaystatus
 wd 'set fmawaygone value ' , ": loggedin *. (<Glogin) e. 1 {:: Gawaystatus
@@ -624,14 +638,15 @@ wd 'set fmbagstatus text *', ": Gbagstatus
 handGturnwordlist =: 3 : 0
 if. Gstate = GSCONFIRM do.   NB. display words in CONFIRM state, where they might be changed by a SCOREMOD without changing state
   NB. See who is away
-  awaystg =.; ('BRB: ';'Away: ') (*@#@] # '<br>' ,~ [ , ;:^:_1@])&.> Gawaystatus
+  awaystg =. ; ('BRB: ';'Away: ') (*@#@] # '<br>' ,~ [ , ;:^:_1@])&.> Gawaystatus
+  if. #awaystg do. awaystg =. '<font color=blue>' , awaystg , '</font><br>' end.
   NB. Extract the words that are being retired
   rwords =. (#~ 1 <: (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words.  wordqueue must be empty
   if. #rwords do.
     rwords =. <@(1&{:: , ('';' (late)';' (foul)') {::~ (1 1;0 1) i. 2&{)"1 rwords  NB. word text, with late words indicated
-    wd 'set fmgeneral text *' , awaystg , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # '<font color=red>Click ''Everyone agrees'' when score agreed.</font>  ') , 'Words: ', _2 }. ; ,&', '&.> rwords
+    wd 'set fmgeneral text *' , awaystg , ((*Gtimedisp)  # '<font color=green>Round change.</font><br>') , ((Glogin-:Gactor) # '<font color=red>Click ''Everyone agrees'' when score agreed.</font><br>') , 'Words: ', _2 }. ; ,&', '&.> rwords
   else.
-    wd 'set fmgeneral text *' , awaystg , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # '<font color=red>Click ''Everyone agrees'' when score agreed.</font>  ') , 'No words were scored.'
+    wd 'set fmgeneral text *' , awaystg , ((*Gtimedisp)  # '<font color=green>Round change.</font><br>') , ((Glogin-:Gactor) # '<font color=red>Click ''Everyone agrees'' when score agreed.</font><br>') , 'No words were scored.'
   end.
 end.
 ''
@@ -694,7 +709,7 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
       wd 'set fmgeneral text *' , dqtext, showwds
       if. 0=#dqtext do. wd 'set fmgeneral scroll max' end.
     else.
-      wd 'set fmgeneral scroll min;set fmgeneral text *' , (*Gtimedisp) {:: ('Turn is over.  Make sure ' , Gactor , ' is finishing the scoring.');'Scoring break, turn will continue'  NB. Reset scroll after scoring
+      wd 'set fmgeneral scroll min;set fmgeneral text *' , (*Gtimedisp) {:: ('Turn is over.  ' , Gactor , ' is finishing the scoring.');'Scoring break, turn will continue'  NB. Reset scroll after scoring
     end.
   end.
 end.
