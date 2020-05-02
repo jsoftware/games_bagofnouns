@@ -470,12 +470,14 @@ NB. Set display for the variable buttons
 wd 'set fmsieze0 text *' , (1;((0{::buttoncaptions0) i. Gstate)) {:: buttoncaptions0
 wd 'set fmsieze1 text *' , (1;((0{::buttoncaptions1) i. Gstate)) {:: buttoncaptions1
 if. Gstate -.@e. GSSETTLE,GSCONFIRM do. wd 'set fmscoreadj0 text "";set fmscoreadj1 text ""' end.
-NB. Get the string to show the words from last turn
-if. #allretiredwds do.
-  rwords =. 'Words last turn: ', _2 }. ; ,&', '&.> <@(1&{:: , ('';' (late)';' (foul)') {::~ (1 1;0 1) i. 2&{)"1 allretiredwds  NB. word text, with late words indicated
-else. rwords =. 'No words retired last turn.'
+NB. Get the string to show the words from last turn, if we are in the states where that is meaningful
+if. Gstate e. GSWACTOR,GSWSCORER,GSWAUDITOR,GSWSTART do.
+  if. #Gturnwordlist do.
+    rwords =. 'Words last turn: ', _2 }. ; ,&', '&.> <@(1&{:: , ('';' (late)';' (foul)') {::~ (1 1;0 1) i. 2&{)"1 Gturnwordlist  NB. word text, with late words indicated
+  else. rwords =. 'No words retired last turn.'
+  end.
+  rwords =. '<br><small>' , rwords , '</small>'
 end.
-rwords . '<br><small>' , rwords , '</small>'
 NB. Get away-status string for the acting team
 awaystg =. , ; ('BRB for acting team: ';'Away for acting team: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (-. Gteamup) { Gteams   NB. Away players for the acting team
 awaystg =. awaystg , , ; ('BRB for inactive team: ';'Away for inactive team: ') (*@#@] # '<br>' , [ , ])&.> Gawaystatus ;:^:_1@-.&.> (Gteamup) { Gteams   NB. Away players for the acting team
