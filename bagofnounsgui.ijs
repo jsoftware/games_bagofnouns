@@ -489,7 +489,7 @@ case. GSACTING do. text =. Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Char
 case. GSPAUSE do. text =. 'Clock stopped - ' , Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password')
 case. GSSETTLE do. text =. Gactor , ' is finalizing scores'
 case. GSCONFIRM do.
-  text =. ((*Gtimedisp) {:: 'End of turn';'Round change') , '.  Note words, check score'
+  text =. ((*Gtimedisp) {:: 'End of turn';'Round change') , '.  Remember the words.'
 case. GSCHANGE do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Round change!  Next round: ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
   text =. 'Changing to ' , Groundno {:: 'Taboo';'Charades';'Password';'Scotch'
@@ -517,7 +517,7 @@ GSWSTART 'Start the clock'  'ACT 0'
 GSACTING 'Stop the clock'  'TIMERADJ 0;0;'''
 GSPAUSE 'Start the clock'  'TIMERADJ 1;0;'''
 GSSETTLE 'See all*the words'   'S'
-GSCONFIRM 'Everybody*agrees*score'   'COMMIT 0'
+GSCONFIRM 'Everyone*agrees'   'COMMIT 0'
 GSCHANGE 'Yes, proceed' 'PROCEED 0'
 GSCHANGEWACTOR 'I don''t need*a scorer'   'ACTOR '';1;0'
 GSCHANGEWSCORER ''    ''
@@ -603,9 +603,9 @@ if. Gstate = GSCONFIRM do.   NB. display words in CONFIRM state, where they migh
   rwords =. (#~ 1 <: (2;1)&{::"1) (#~ a: ~: 2&{"1) Gturnwordlist , Gwordqueue  NB. Remove unacted & unretired words.  wordqueue must be empty
   if. #rwords do.
     rwords =. <@(1&{:: , ('';' (late)';' (foul)') {::~ (1 1;0 1) i. 2&{)"1 rwords  NB. word text, with late words indicated
-    wd 'set fmgeneral text *' , awaystg , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'Words: ', _2 }. ; ,&', '&.> rwords
+    wd 'set fmgeneral text *' , awaystg , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # '<font color=red>Click ''Everyone agrees'' when score agreed.</font>  ') , 'Words: ', _2 }. ; ,&', '&.> rwords
   else.
-    wd 'set fmgeneral text *' , awaystg , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # 'Click when score agreed.  ') , 'No words were scored.'
+    wd 'set fmgeneral text *' , awaystg , ((*Gtimedisp)  # 'Round change.  ') , ((Glogin-:Gactor) # '<font color=red>Click ''Everyone agrees'' when score agreed.</font>  ') , 'No words were scored.'
   end.
 end.
 ''

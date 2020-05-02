@@ -290,6 +290,7 @@ Gbagstatus =: 0 0 0
 Gteamnames =: 2$a:  NB. empty team names
 Gauditor =: ''
 Gswrev =: 0
+allretiredwds =: 0 3$a:
 NB.?lintsaveglobals
 )
 initstate''
@@ -560,6 +561,8 @@ if. Gstate e. GSWSTART,GSCHANGEWSTART do.
     NB. have all the words that were exposed this turn
     Gturnwordlist =: 0 3$a:
     NB.?lintonly Gturnwordlist =: ,: 1;'word';1 1
+    NB. Clear the list of all words retired this turn (in all rounds)
+    allretiredwds =: 0 3$a:
     NB. We save a copy of the exposedwords before we start so that we can delete words dismissed twice in a row
     prevexposedwords =: exposedwords
     NB. Move the acting player to the bottom of the priority list
@@ -719,6 +722,8 @@ if. Gstate = GSCONFIRM do.
   addtolog Gactor , ': ' , (, '' 8!:2 rdscore) , ' pts ' , Groundno{::'(taboo)';'(charades)';'(password)'
   handledmsk =. 1 <: (2;1)&{::"1 Gturnwordlist  NB. words we finished
   Gdqlist =: ((2 {."1 Gdqlist) -.@e. (handledmsk # 2 {."1 Gturnwordlist)) # Gdqlist  NB. Remove dqs for words we are showing now
+  NB. Keep running list of all words retired this turn
+  allretiredwds =: allretiredwds , handledmsk # Gturnwordlist
   Gturnwordlist =: (-. handledmsk) # Gturnwordlist  NB. The  words have now passed on
   if. Gtimedisp=0 do.
     NB. if no time left, handle end-of-turn
@@ -738,6 +743,8 @@ if. Gstate = GSCONFIRM do.
     NB. This is where end-of-turn happens.
     NB. Should be out of time, since there are no words to act.  Clear time just in case, and go look for next actor, from the other team
     Gtimedisp =: 0 [ Gteamup =: -. Gteamup [ Gstate =: GSWACTOR [ Groundno =: nextroundno''
+    NB. Going to ACTOR - repurpose Gturnwordlist to hold all the words exposed in the previous turn.  This is displayed until the acting starts
+    Gturnwordlist =: allretiredwds
   end. 
   bagstatus''  NB. Update count of words yet to do
 end.
