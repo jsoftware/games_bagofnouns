@@ -467,10 +467,11 @@ end.
 awaystg
 )
 
+NB. y is prefix string for nonempty
 getoldwords =: 3 : 0
 if. #Gturnwordlist do.
   rwords =. 'Words last turn: ', _2 }. ; ,&', '&.> <@(1&{:: , ('';' (late)';' (foul)') {::~ (1 1;0 1) i. 2&{)"1 Gturnwordlist  NB. word text, with late words indicated
-  rwords =. '<br><br><small>' , rwords , '</small>'
+  rwords =. y , '<small>' , rwords , '</small>'
 else. rwords =. ''
 end.
 rwords
@@ -490,7 +491,7 @@ wd 'set fmsieze0 text *' , (1;((0{::buttoncaptions0) i. Gstate)) {:: buttoncapti
 wd 'set fmsieze1 text *' , (1;((0{::buttoncaptions1) i. Gstate)) {:: buttoncaptions1
 if. Gstate -.@e. GSSETTLE,GSCONFIRM do. wd 'set fmscoreadj0 text "";set fmscoreadj1 text ""' end.
 NB. Get the string to show the words from last turn, if we are in the states where that is meaningful
-if. Gstate e. GSWACTOR,GSWSCORER,GSWAUDITOR,GSWSTART do. rwords =. getoldwords'' else. rwords =. '' end.
+if. Gstate e. GSWACTOR,GSWSCORER,GSWAUDITOR,GSWSTART do. rwords =. getoldwords '<br><br>' else. rwords =. '' end.
 NB. Get away-status string
 awaystg =. getawaystg''
 NB. Display the status line; if the general line is known from the state, do it too
