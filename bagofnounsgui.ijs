@@ -529,6 +529,7 @@ case. GSCHANGEWSCORER do.
 case. GSCHANGEWAUDITOR do.
   if. Glogin-:Gactor do. wd 'set fmgeneral text *If you''re sure you won''t make a mistake, you can play without an auditor.'
   else. wd 'set fmgeneral text *Click to audit (',(((-.Gteamup);0) {:: Gteams),' is up next for ',((-.Gteamup) {:: Gteamnames),').' , awaystg , rwords
+  end.
   text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
 case. GSCHANGEWSTART do.
   if. Glogin-:Gscorer do.
