@@ -2,7 +2,7 @@ require 'socket'
 require 'strings'
 require'format/printf'
 sdcleanup_jsocket_ =: 3 : '0[(sdclose ::0:"0@[ shutdownJ@(;&2)"0)^:(*@#)SOCKETS_jsocket_'
-SWREV =: 102  NB. Current EC level
+SWREV =: 103  NB. Current EC level
 
 NB. Todo:
 NB. allow look at wds from previous round
