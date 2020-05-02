@@ -358,7 +358,7 @@ end.
 )
 
 NB. Order of processing state info
-statepri =: (;: 'Gswrev Gteamnames Glogin Groundtimes Gturnblink Gdqlist Gawaystatus Gstate Gteams Groundno Gactor Gscorer Gteamup Gwordstatus Glogtext Gwordundook Gbagstatus Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
+statepri =: (;: 'Gswrev Gteamnames Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordundook Gbagstatus Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
 NB. Process the command queue, which is a list of boxes.  Each box contains
 NB. the 5!:5 of a table of state information, as
 NB. infotype ; value
@@ -490,7 +490,7 @@ wd 'set fmsieze0 text *' , (1;((0{::buttoncaptions0) i. Gstate)) {:: buttoncapti
 wd 'set fmsieze1 text *' , (1;((0{::buttoncaptions1) i. Gstate)) {:: buttoncaptions1
 if. Gstate -.@e. GSSETTLE,GSCONFIRM do. wd 'set fmscoreadj0 text "";set fmscoreadj1 text ""' end.
 NB. Get the string to show the words from last turn, if we are in the states where that is meaningful
-if. Gstate e. GSWACTOR,GSWSCORER,GSWAUDITOR,GSWSTART do. rwords =. getoldwords'' end.
+if. Gstate e. GSWACTOR,GSWSCORER,GSWAUDITOR,GSWSTART do. rwords =. getoldwords'' else. rwords =. '' end.
 NB. Get away-status string
 awaystg =. getawaystg''
 NB. Display the status line; if the general line is known from the state, do it too
@@ -522,10 +522,10 @@ case. GSCHANGEWACTOR do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Do you want a scorer for the ',(Groundno {:: 'Taboo';'Charades';'Password'),' round?'
   text =. 'Does ' , Gactor , ' need a scorer for ',(Groundno {:: 'Taboo';'Charades';'Password'),'?' 
 case. GSCHANGEWSCORER do.
-  wd 'set fmgeneral text *Click to score (',(((-.Gteamup);0) {:: Gteams),' is next in line).' , awaystg , rwords
+  wd 'set fmgeneral text *Click to score (',(((-.Gteamup);0) {:: Gteams),' is next in line).' , awaystg
   text =. 'Need someone to score for ' , Gactor
 case. GSCHANGEWAUDITOR do.
-  wd 'set fmgeneral text *Click to audit (',(((-.Gteamup);0) {:: Gteams),' is next in line).' , awaystg , rwords
+  wd 'set fmgeneral text *Click to audit (',(((-.Gteamup);0) {:: Gteams),' is next in line).' , awaystg
   text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
 case. GSCHANGEWSTART do.
   if. Glogin-:Gscorer do.
