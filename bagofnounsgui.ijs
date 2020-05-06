@@ -180,6 +180,8 @@ pas 0 0;
 formbon_run =: 3 : 0
 sdcleanup_jsocket_''
 conntoback 4000
+NB. Init
+loggedin =: 0
 
 wd :: 0: 'psel formbon;pclose'
 wd FORMBON
@@ -358,7 +360,7 @@ end.
 )
 
 NB. Order of processing state info
-statepri =: (;: 'Gswrev Gteamnames Gawaystatus Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gwordstatus Glogtext Gwordundook Gbagstatus Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
+statepri =: (;: 'Gswrev Gteamnames Glogin Gawaystatus Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gwordstatus Glogtext Gwordundook Gbagstatus Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
 NB. Process the command queue, which is a list of boxes.  Each box contains
 NB. the 5!:5 of a table of state information, as
 NB. infotype ; value
@@ -394,6 +396,7 @@ wd '01' ('set fmtmname',[,' text *',])&> Gteamnames
 ''
 )
 
+
 NB. The handlers, in priority order.  They all return empty
 handGlogin =: 3 : 0
 loggedin =: 3 <: #Glogin
@@ -404,6 +407,23 @@ elseif. loggedin do.
 else.
   wd 'set fmloggedin text *Login by selecting' , ((Gstate=GSWORDS) # ' or entering') , ' your name'
 end.
+''
+)
+
+handGawaystatus =: 3 : 0
+if. Gstate=GSWSTART do.
+  awaystg =. getawaystg''
+  rwords =. getoldwords''
+  if. Glogin-:Gscorer do.
+    if. Glogin-:Gactor do. wd 'set fmgeneral text *You may fire when you are ready, Gridley.' , awaystg
+    else. wd 'set fmgeneral text *Start the clock when told to.'
+    end.
+  elseif. Glogin-:Gactor do. wd 'set fmgeneral text *When you are ready, tell the scorer to start the clock.' , awaystg
+  else. wd 'set fmgeneral text *' , awaystg , rwords
+  end.
+end.
+wd 'set fmawaybrb value ' , ": loggedin *. (<Glogin) e. 0 {:: Gawaystatus
+wd 'set fmawaygone value ' , ": loggedin *. (<Glogin) e. 1 {:: Gawaystatus
 ''
 )
 
@@ -601,23 +621,6 @@ handGscorer =: 3 : 0
 )
 
 handGteamup =: 3 : 0
-''
-)
-
-handGawaystatus =: 3 : 0
-if. Gstate=GSWSTART do.
-  awaystg =. getawaystg''
-  rwords =. getoldwords''
-  if. Glogin-:Gscorer do.
-    if. Glogin-:Gactor do. wd 'set fmgeneral text *You may fire when you are ready, Gridley.' , awaystg
-    else. wd 'set fmgeneral text *Start the clock when told to.'
-    end.
-  elseif. Glogin-:Gactor do. wd 'set fmgeneral text *When you are ready, tell the scorer to start the clock.' , awaystg
-  else. wd 'set fmgeneral text *' , awaystg , rwords
-  end.
-end.
-wd 'set fmawaybrb value ' , ": loggedin *. (<Glogin) e. 0 {:: Gawaystatus
-wd 'set fmawaygone value ' , ": loggedin *. (<Glogin) e. 1 {:: Gawaystatus
 ''
 )
 
