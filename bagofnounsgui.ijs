@@ -358,7 +358,7 @@ end.
 )
 
 NB. Order of processing state info
-statepri =: (;: 'Gswrev Gteamnames Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gawaystatus Gwordstatus Glogtext Gwordundook Gbagstatus Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
+statepri =: (;: 'Gswrev Gteamnames Gawaystatus Glogin Groundtimes Gturnblink Gdqlist Gstate Gteams Groundno Gactor Gscorer Gteamup Gwordstatus Glogtext Gwordundook Gbagstatus Gturnwordlist Gwordqueue Gbuttonblink Gscore Gtimedisp')
 NB. Process the command queue, which is a list of boxes.  Each box contains
 NB. the 5!:5 of a table of state information, as
 NB. infotype ; value
