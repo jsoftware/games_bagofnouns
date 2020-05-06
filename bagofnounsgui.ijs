@@ -501,7 +501,8 @@ case. GSLOGINOK do. text =. 'OK to login'
 case. GSAUTH do. text =. 'Waiting for authorization'
 case. GSWORDS do. text =. 'Players are entering words'
 case. GSWACTOR do.
-  wd 'set fmgeneral text *Next up for ',(Gteamup {:: Gteamnames),': ' , ((Gteamup;0) {:: Gteams) , ' then ' , ((Gteamup;1) {:: Gteams) , awaystg , rwords
+  upplrs =. 2 {. (Gteamup {:: Gteams) -. 1 {:: Gawaystatus  NB. top 2 from teamup, but not if away
+  wd 'set fmgeneral text *Up for ',(Gteamup {:: Gteamnames),': ' , (0 {:: upplrs) , (' then '&,^:(*@#) (1 {:: upplrs)) , awaystg , rwords
   text =. 'Need player for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
 case. GSWSCORER do.
   wd 'set fmgeneral text *Click to score (',(((-.Gteamup);0) {:: Gteams),' is up next for ',((-.Gteamup) {:: Gteamnames),').' , awaystg , rwords
