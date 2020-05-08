@@ -528,11 +528,13 @@ case. GSWACTOR do.
   text =. 'Need player for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
 case. GSWSCORER do.
   upplr =. > {. ((-. Gteamup) {:: Gteams) -. 1 {:: Gawaystatus  NB. top from teamup, but not if away
-  wd 'set fmgeneral text *Click to score' , ((*@#upplr) # '(',upplr,' is up next for ',((-.Gteamup) {:: Gteamnames),')'),'.' , awaystg , rwords
+  wd 'set fmgeneral text *Click to score' , ((*@#upplr) # ' (',upplr,' is up next for ',((-.Gteamup) {:: Gteamnames),')'),'.' , awaystg , rwords
   text =. 'Need someone to score for ' , Gactor
 case. GSWAUDITOR do.
   if. Glogin-:Gactor do. wd 'set fmgeneral text *If you''re sure you won''t make a mistake, you can play without an auditor.'
-  else. wd 'set fmgeneral text *Click to audit (',(((-.Gteamup);0) {:: Gteams),' is up next for ',((-.Gteamup) {:: Gteamnames),').' , awaystg , rwords
+  else.
+    upplr =. > {. ((-. Gteamup) {:: Gteams) -. 1 {:: Gawaystatus  NB. top from teamup, but not if away
+    wd 'set fmgeneral text *Click to audit' , ((*@#upplr) # ' (',upplr,' is up next for ',((-.Gteamup) {:: Gteamnames),')'),'.' , awaystg , rwords
   end.
   text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
 case. GSWSTART do.
