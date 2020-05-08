@@ -201,13 +201,6 @@ NB.?lintsaveglobals
 ''
 )
 
-NB. x is desired pointsize when logperinch=72
-setfont =: 4 : 0
-pts =. 8 >. <. <.@(0.5&+)&.(%&4) x * 72 % {: screenpx
-wd y rplc '*';":pts
-''
-)
-
 NB. Called from time to time
 NB. y is forcefrac
 winresize =: 3 : 0
@@ -240,6 +233,15 @@ if. screenwh -.@-: oldwh do.
 end.
 NB. remember the proportion
 screenfrac =: (2 3 { 0 ". wd 'qform') % screenwh
+NB.?lintsaveglobals
+''
+)
+
+NB. x is desired pointsize when logperinch=72
+setfont =: 4 : 0
+pts =. 8 >. <. <.@(0.5&+)&.(%&4) x * 72 % {: screenpx
+wd y rplc '*';":pts
+''
 )
 
 
@@ -525,7 +527,8 @@ case. GSWACTOR do.
   wd 'set fmgeneral text *Up for ',(Gteamup {:: Gteamnames),': ' , (0 {:: upplrs) , (' then '&,^:(*@#) (1 {:: upplrs)) , awaystg , rwords
   text =. 'Need player for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
 case. GSWSCORER do.
-  wd 'set fmgeneral text *Click to score (',(((-.Gteamup);0) {:: Gteams),' is up next for ',((-.Gteamup) {:: Gteamnames),').' , awaystg , rwords
+  upplr =. > {. ((-. Gteamup) {:: Gteams) -. 1 {:: Gawaystatus  NB. top from teamup, but not if away
+  wd 'set fmgeneral text *Click to score' , ((*@#upplr) # '(',upplr,' is up next for ',((-.Gteamup) {:: Gteamnames),')'),'.' , awaystg , rwords
   text =. 'Need someone to score for ' , Gactor
 case. GSWAUDITOR do.
   if. Glogin-:Gactor do. wd 'set fmgeneral text *If you''re sure you won''t make a mistake, you can play without an auditor.'
@@ -756,7 +759,7 @@ handGtimedisp =: 3 : 0
 if. Gstate e. GSWACTOR,GSWSTART,GSACTING,GSPAUSE,GSSETTLE,GSCHANGE do. wd 'set fmprogress value *',": Gtimedisp end.
 wd 'set fmretire3 enable ' , ": (Gstate=GSSETTLE) *. (Glogin-:Gactor)
 wd 'set fmretire4 enable ' , ": ((Gstate e. GSACTING,GSPAUSE) *. (Glogin-:Gscorer)) +. (Gstate=GSSETTLE) *. (Glogin-:Gactor)
-wd 'set fmretire4 text *', (*@#Gtimedisp) {:: ('Foul/',LF,'Got',LF,'Late');'Foul'
+wd 'set fmretire4 text *', (*Gtimedisp) {:: ('Foul/',LF,'Got',LF,'Late');'Foul'
 
 ''
 )
@@ -786,6 +789,9 @@ else.
   end.
 end.
 backcmd 'LOGIN ''',fmlogin,''''
+awaybrb =: awaygone =: 0
+wd 'set fmawaygone value 0;set fmawaybrb value 0'
+backcmd 'AWAYSTATUS ''' , fmlogin , ''';0'  NB. remove awaystatus on login
 i. 0 0
 )
 
@@ -823,13 +829,13 @@ i. 0 0
 )
 formbon_fmawaybrb_button =: 3 : 0
 awaygone =: 0 [ awaybrb =: -. awaybrb
-wd 'set fmawaygone value 0;set fmawaybrb ' , ": awaybrb
+wd 'set fmawaygone value 0;set fmawaybrb value ' , ": awaybrb
 backcmd 'AWAYSTATUS ''' , Glogin , ''';' , ": awaybrb  NB. 0=here, 1=brb, 2=away
 i. 0 0
 )
 formbon_fmawaygone_button =: 3 : 0
 awaybrb =: 0 [ awaygone =: -. awaygone
-wd 'set fmawaybrb value 0;set fmawaygone ' , ": awaygone
+wd 'set fmawaybrb value 0;set fmawaygone value ' , ": awaygone
 backcmd 'AWAYSTATUS ''' , Glogin , ''';' , ": 2 * awaygone  NB. 0=here, 1=brb, 2=away
 i. 0 0
 )
