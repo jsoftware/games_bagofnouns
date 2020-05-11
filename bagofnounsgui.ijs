@@ -2,7 +2,7 @@ require 'socket'
 require 'strings'
 require'format/printf'
 sdcleanup_jsocket_ =: 3 : '0[(sdclose ::0:"0@[ shutdownJ@(;&2)"0)^:(*@#)SOCKETS_jsocket_'
-SWREV =: 103  NB. Current EC level
+SWREV =: 104  NB. Current EC level
 
 NB. Todo:
 NB. allow look at wds from previous round
@@ -78,9 +78,6 @@ login
 
 FORMBON =: 0 : 0
 pc formbon escclose closeok;pn "Bag Of Nouns";
-menupop Teams;
-menu fmteamshow "Show teams";
-menupopz;
 menupop Away;
 menu fmawaybrb "Be right back";
 menu fmawaygone "Continue without me";
@@ -329,10 +326,6 @@ NB. obsolete smoutput'data from BE '  NB. scaf
     if. #cmdqueue do. proccmds cmdqueue end.  NB. Ignore empty heartbeat
   end.
   NB. See if the connection is slow
-  if. 2 < responsetime =. (6!:1'') - heartbeatrcvtime do.
-    wd 'psel formbon;set fmslowconn text *Slow connection' , (responsetime>4.) # ' ' , (, ':'&,)&(_2&({.!.'0')@":)/ 60 60 #: <. responsetime
-  else. wd 'psel formbon;set fmslowconn text ""'  NB. Clear message if OK
-  end.
 end.
 catch.
   wd'psel formbon;ptimer 0'
@@ -354,6 +347,9 @@ if. sk do.
   while. #senddata do.
     if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';1000 do. backdied 5 return. end.
     rc =. senddata sdsend_jsocket_ sk,0
+if. #y do.
+  qprintf'y '
+end. NB. scaf
     if. 0~:0{::rc do. backdied 6 return. end.
     senddata =. (1 {:: rc) }. senddata
   end.
@@ -459,7 +455,6 @@ NB. Button-enable based on state
 NB. rows are buttons, columns are state. c1 is always 1, l1 only if logged in. a is 'not actor', A is 'actor', la is 'logged in not actor', S01 is 'scorer in rds 0&1' 
 NB.             HELLO LOGINOK AUTH WORDS WACTOR WSCORER WAUD WSTART ACTING PAUSE SETTLE CONFIRM CHANGE CHANGEWACT CHANGEWSCO CHANGWAUD CHANGEWSTART GAMEOVER
 statetoenable =: ;:;._2 (0 : 0)
-fmteamshow       l0     l0     l0   l1     l1     l1      l1     l1    l1    l1     l1     l1     l1      l1          l1        l1     l1         c0
 fmawaybrb        l0     l0     l0   l1     l1     l1      l1     l1    l1    l1     l1     l1     l1      l1          l1        l1     l1         c0
 fmawaygone       l0     l0     l0   l1     l1     l1      l1     l1    l1    l1     l1     l1     l1      l1          l1        l1     l1         c0
 fmtimerp5        l0     l0     l0   l0     l0     l0      l0     l0    l1    l1     l1     l0     l0      l0          l0        l0     l0         c0
@@ -819,14 +814,6 @@ i. 0 0
 formbon_fmscoreadj1_button =: 3 : 0
 adj =. ": adjn =.  auditscoreadj fmscoreadj1
 if. adjn do. backcmd 'SCOREADJ 1;',adj,';''',Glogin,'''' end.
-i. 0 0
-)
-formbon_fmteamshow_button =: 3 : 0
-if. 1=#Gteams do.
-  wdmodal 'mb info mb_ok "Teams Not Assigned Yet" *The players are:',LF,LF, ; ,&LF&.> ; Gteams
-elseif. 2=#Gteams do.
-  wdmodal 'mb info mb_ok "Teams" *' , ; ,&LF&.>  a: ,.~ Gteamnames  ,. > Gteams
-end.
 i. 0 0
 )
 formbon_fmawaybrb_button =: 3 : 0

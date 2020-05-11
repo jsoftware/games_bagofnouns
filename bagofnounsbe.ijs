@@ -68,6 +68,7 @@ NB. obsolete sockloop lsk;tourn;password
 wd 'timer 50'
 waitstate =: 0   NB. no waitmsgs yet
 sk =: 0  NB. No FE connection
+ssk =: 0  NB. No host connection
 gamehistory =: ''  NB. total of entire log
 ''
 )
@@ -105,91 +106,92 @@ while. do.
   if. feconnlost do. break. end.
   NB. If there is not another command, exit to process them
   cmdqueue =. cmdqueue , < hlen }. readdata
-  if. hlen >: 0 do. break. end.  NB. >0 only if error
+  if. hlen = 0 do. if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do. break. end. end.  NB. if hlen<0, we have started reading a length; if 0, must check
   hdr =. hlen {. readdata  NB. transfer the length
   if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.5 break. end.
 end.
 if. feconnlost do. feconnlost [ smoutput 'fe connection lost'  return. end.
 NB. perform pre-sync command processing.
-NB. obsolete if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
-senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('INCR "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
+if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
+senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('MULTI "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
 NB. Create a connection to the server and send all the data in an INCR command
-sendstarttime =. 6!:1''  NB. scaf
-for_dly. 1 1 300 # 1000 2000 3000 do.
-  NB.?lintloopbodyalways
-  ssk =. 1 {:: sdsocket_jsocket_ ''  NB. listening socket
-  sdioctl_jsocket_ ssk , FIONBIO_jsocket_ , 1  NB. Make socket non-blocking
-  rc =. sdconnect_jsocket_ ssk;qbm,<8090
-  if. ssk e. 2 {:: sdselect_jsocket_ '';ssk;'';dly do. break. end.
-  sdclose_jsocket_ ssk
-  smoutput 'Error ' , (":rc) , ' connecting to server'
-  qbm2 =. }. sdgethostbyname_jsocket_ 'www.quizbowlmanager.com'  NB. In case the address changed
-  if. _1 {:: qbm2 -.@-: '255.255.255.255' do. qbm =: qbm2 end.  NB. Save new address, if it is valid
-  ssk =. 0
-end.
-if. ssk=0 do.  NB. uncorrectable server error
-  7 return.
+if. 0=ssk do.  NB. If we don't have an open connection, make one
+  for_dly. 1 1 300 # 1000 2000 3000 do.
+    NB.?lintloopbodyalways
+    ssk =: 1 {:: sdsocket_jsocket_ ''  NB. listening socket
+    sdioctl_jsocket_ ssk , FIONBIO_jsocket_ , 1  NB. Make socket non-blocking
+    rc =. sdconnect_jsocket_ ssk;qbm,<8090
+    if. ssk e. 2 {:: sdselect_jsocket_ '';ssk;'';dly do. break. end.
+    sdclose_jsocket_ ssk
+    smoutput 'Error ' , (":rc) , ' connecting to server'
+    qbm2 =. }. sdgethostbyname_jsocket_ 'www.quizbowlmanager.com'  NB. In case the address changed
+    if. _1 {:: qbm2 -.@-: '255.255.255.255' do. qbm =: qbm2 end.  NB. Save new address, if it is valid
+    ssk =: 0
+  end.
+  if. ssk=0 do.  NB. uncorrectable server error
+    7 return.
+  end.
+  hangoverdata =: ''
+qprintf'ssk '
 end.
 NB. Send the data.  Should always go in one go
 while. #senddata do.
   rc =. senddata sdsend_jsocket_ ssk,0
-  if. 0{::rc do. 0{::rc return. end.
+  if. 0{::rc do. 0{::rc [ ssk =: 0 [ sdclose_jsocket_ ssk return. end.
   if. (#senddata) = 1{::rc do. break. end.
   senddata =. (1{::rc) }. senddata
   if. -. ssk e. 2 {:: sdselect_jsocket_ '';ssk;'';5000 do. rc =. 1;'' break. end.
 end.
-if. 0{::rc do. 8 [ sdclose_jsocket_ ssk return. end.  NB. error sending - what's that about?  Abort
+if. 0{::rc do. 8 [ ssk =: 0 [ sdclose_jsocket_ ssk  return. end.  NB. error sending - what's that about?  Abort
+
 NB. Read the response, until the server closes
-readdata =. ''
-while. do.
-  for. i. 3 do.
-    NB.?lintloopbodyalways
-    rsockl =. 1 {:: sdselect_jsocket_ ssk;'';ssk;4000
-    if. ssk e. rsockl do. break. end.  NB. should respond quickly
-    smoutput '4s timeout from server'
-  end.
-  if. -. ssk e. rsockl do. readdata =. '' break. end.  NB. Exit with empty data as error flag
-  'rc data' =. sdrecv_jsocket_ ssk,10000,0
-  if. rc do. rc return. end.
-  if. 0=#data do. break. end.  NB. Normal exit: host closes connection
-  readdata =. readdata , data  NB. Accumulate reply
-end.
-if. 0.3 < sendstarttime =. (6!:1'') - sendstarttime do. smoutput 'server delay=',":sendstarttime end.  NB. scaf
-sdclose_jsocket_ ssk
-if. #readdata do.
+'rc rsockl wsockl esockl' =. sdselect_jsocket_ ssk;'';ssk;0
+if. (rc~:0) +. ssk e. esockl do. ssk =: 0 [ sdclose_jsocket_ ssk return. end.
+if. ssk e. rsockl do.  NB. If there's read data, process it
+  'rc readdata' =. sdrecv_jsocket_ ssk,10000,0  NB. read it
+  if. rc do. rc [ ssk =: 0 [ sdclose_jsocket_ ssk return. end.  NB. error reading: close socket
+  if. 0=#readdata do. 0 [ ssk =: 0 [ sdclose_jsocket_ ssk return. end.  NB. Host closes connection: close socket
+qprintf'hangoverdata readdata '
+  hangoverdata =: hangoverdata , readdata
   NB. Verify response validity.
   NB. If we don't get a valid response, the game is in an unknown state.  There's nothing good to do, so we
   NB. will ignore the response and continue, hoping that the host correctly logged our data
-  'rc data' =. fileserv_decrsphdr_sockfileserver_ readdata
-  NB. Process the response
-  if. (rc=0) do.   NB. to handle login seq we must pass heartbeats through
+  NB. Process commands until we get to no data or incomplete command
+  whilst. #hangoverdata do.
+    'rc data xsdata' =. fileserv_decrsphdr_sockfileserver_ hangoverdata
+qprintf'rc data xsdata '
+    hangoverdata =: xsdata   NB. save extra data for next time
+    if. rc>0 do. 9 [ ssk =: 0 [ sdclose_jsocket_ ssk  return. end.   NB. Invalid msg - abort the connection
+    NB. Process the response
+    if. rc<0 do. break. end.   NB. stop when we don't have a full command to process
 NB. obsolete if. #data do. qprintf'data 'end.
     incrhwmk =: (0 >.incrhwmk) + #data  NB.Since we processed it, skip over this data in the future
 gamehistory =: gamehistory , data
-    postsync data
-    NB. Send new state info to the front end
-    gbls =. ".&.> gblifnames  NB. current values
-    chgmsk =. gbls ~: Ggbls  NB. see what's different
-    diffs =. (chgmsk # gblifnames) ,. chgmsk # gbls
-    Ggbls =: gbls  NB. save current values to be old state next time
-    Gbuttonblink =: ''  NB. this is a one-shot; clear after each change
-    Gturnblink =: 0  NB. Also a one-shot
-    NB. Return the changes; if none, return a 0-length heartbeat
-    if. #diffs do.
+    if. #data do. postsync data end.
+  end.
+end.
+
+NB. Send new state info to the front end - it might have come from pre- or post-sync actions
+gbls =. ".&.> gblifnames  NB. current values
+chgmsk =. gbls ~: Ggbls  NB. see what's different
+diffs =. (chgmsk # gblifnames) ,. chgmsk # gbls
+Ggbls =: gbls  NB. save current values to be old state next time
+Gbuttonblink =: ''  NB. this is a one-shot; clear after each change
+Gturnblink =: 0  NB. Also a one-shot
+NB. Return the changes; if none, return a 0-length heartbeat
+if. #diffs do.
 NB. obsolete       nwdiffs =. (#~   (<'Gwordstatus') ~: {."1) diffs   NB. scaf
 NB. obsolete       qprintf'nwdiffs '
-      chg =. 5!:5 <'diffs'  NB. Get data to send
-    else. chg=.''  NB. if no diffs, send heartbeat
-    end.
-    senddata =. (2 (3!:4) #chg) , chg   NB. prepend length
-    while. #senddata do.
-      if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';5000 do. 9 return.  end.
-      rc =. senddata sdsend_jsocket_ sk,0
-      if. 0{::rc do. 0{::rc return. end.
-      if. (#senddata) = 1{::rc do. break. end.
-      senddata =. (1{::rc) }. senddata
-    end.
-  end.
+  chg =. 5!:5 <'diffs'  NB. Get data to send
+else. chg=.''  NB. if no diffs, send heartbeat
+end.
+senddata =. (2 (3!:4) #chg) , chg   NB. prepend length
+while. #senddata do.
+  if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';5000 do. 9 return.  end.
+  rc =. senddata sdsend_jsocket_ sk,0
+  if. 0{::rc do. 0{::rc return. end.
+  if. (#senddata) = 1{::rc do. break. end.
+  senddata =. (1{::rc) }. senddata
 end.
 NB. If we did not read a response, quietly discard it
 0
@@ -359,7 +361,7 @@ bagstatus =: 3 : 0
 Gbagstatus =: <: #/.~ (<"0 i.3) , {."1 Gwordqueue , exposedwords , wordbag
 ''
 )
-NB. y is sequence or CRLF-delimited commands from the server.  We process them one by one,
+NB. y is sequence of CRLF-delimited commands from the server.  We process them one by one,
 NB. making changes to the globals as we go.  Then, we send the changed globals to the FE.
 postsync =: 3 : 0
 ". :: (addtolog@('Failed: '&,)) @('postyh'&,);._2 y -. CR   NB. run em all
@@ -411,6 +413,11 @@ end.
 ''
 )
 
+NB. Convert word to canonical form
+canonword =: 3 : 0
+(-.&' ''-,/')@:tolower y
+)
+
 NB. name ; 5!:5 'words' - audited in the FE
 postyhWORDS =: 3 : 0
 'name words' =. y
@@ -418,7 +425,9 @@ NB. Accept it if we haven't started
 if. Gstate=GSWORDS do.
   otherwords =. (<name) (] #~ (~: {."1)) Gwordstatus
   NB. Remove matches for the word.  Could do plurals, Leveshtein, etc here
-  words =. words -. ; 1 {"1 otherwords
+  canonnew =. canonword&.> words
+  canonold =. canonword&.> ; 1 {"1 otherwords
+  words =. words #~ canonnew -.@e. canonold
   Gwordstatus =: (name;<words) ,~ otherwords
   Gbagstatus =: # ; 1 {"1 Gwordstatus
 end.
@@ -451,7 +460,7 @@ NB.?lintonly Gteams =: (;:'Bob Carol'),&<(;:'Ted Alice')
   Gteamup =: 0 [ actorhist =: 0 2$a:
   NB. Init the wordlist and history from prev round
   NB. wordbag is list of round;word where each round's words are put in pseudorandom order by CRC, but kept in group by round
-  words =. /:~~ ; 1 {"1 Gwordstatus   NB. All the words, in order
+  words =. /:~ ; 1 {"1 Gwordstatus   NB. All the words, in order
   wordbag =: ,/ 0 1 2 ([ ;"0 ;@:(<@(] /: (128!:3@,&> {&(;:'aV76 Gr83l H2df968'))~)))"0 _ words
 NB.?lintonly wordbag =: ,: 1;'word'
   NB. exposedwords is the priority list that we must finish before going into the wordbag.  It is
@@ -468,6 +477,8 @@ NB. Gwordqueue =: ,: '1';'word';< ,<'dq'
   Gstate=:GSWACTOR
   Gtimedisp =: 0
   bagstatus''  NB. Init display of # words per round left
+  NB. Display the teams
+'<br><br>' addtolog ; ,&'<br>'&.>  a: ,.~ Gteamnames  ,. > Gteams
 NB.?lintsaveglobals
 ''
 end.
@@ -2676,28 +2687,36 @@ h =. 'Content-Length: ' , (":#y) , CRLF
 )
 
 NB. Analyze response
+NB. x, if 1, means 'message must be self-contained' (default 0)
 NB. y is data read
-NB. result is rc;data
+NB. result is rc;data;hangover data in next msg
+NB. rc of _1 means 'incomplete msg, wait for more'
 NB. We check for length
 fileserv_decrsphdr =: 3 : 0
-NB. Strip header
-msghdr =. ( {.~ (CRLF,CRLF)&(#@[ + (i.&1@:E.)) ) y
-NB. Get rc line from header
-msgrc =. 2 {. <;._1 ' ' , ({.~ CRLF&(i.&1@:E.)) msghdr
-if. msgrc -.@e. (<'HTTP/1.1'),.('200';'201';'202';'203';'204';'205') do.
-  NB. If not valid response, return error
-  (({.!.999) 999 ". 1 {:: msgrc);y 
-elseif.
-  NB. Get the Content-Length from the header
-  NB. Split on LF; remove CRLF
-  lines =. <@(-.&CRLF);._2 msghdr
-  NB. Split each line into name;value
-  namval =. (({.~ ; (}.~ >:)) ': '&(i.&1@:E.))@> lines
-  len =. {. 0 ". pw =. (<'Content-Length') '' getklu_defu_colsv (0;1) namval
-  len ~: y -&# msghdr do.
-  998 ; ''
-elseif. do.
-  0 ; (#msghdr) }. y
+0 fileserv_decrsphdr y
+:
+NB. See if header is complete
+if. (CRLF,CRLF)&(+./@:E.) y do.
+  NB. Strip header
+  msghdr =. ( {.~ (CRLF,CRLF)&(#@[ + (i.&1@:E.)) ) y
+  NB. Get rc line from header
+  msgrc =. 2 {. <;._1 ' ' , ({.~ CRLF&(i.&1@:E.)) msghdr
+  if. msgrc -.@e. (<'HTTP/1.1'),.('200';'201';'202';'203';'204';'205') do.
+    NB. If not valid response, return error
+    (({.!.999) 999 ". 1 {:: msgrc);y;'' 
+  elseif.
+    NB. Get the Content-Length from the header
+    NB. Split on LF; remove CRLF
+    lines =. <@(-.&CRLF);._2 msghdr
+    NB. Split each line into name;value
+    namval =. (({.~ ; (}.~ >:)) ': '&(i.&1@:E.))@> lines
+    len =. {. 0 ". pw =. (<'Content-Length') '' getklu_defu_colsv (0;1) namval
+    len > y -&# msghdr do.  NB. Msg too short
+    _1 ; '' ; y  NB. incomplete message, wait for more
+  elseif. do.
+    0 ; len ({. ; }.) (#msghdr) }. y
+  end.
+else. _1 ; '' ; y  NB. incomplete message, wait for more
 end.
 )
 
