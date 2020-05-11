@@ -130,7 +130,7 @@ grid colstretch 0 5; grid colstretch 1 2;
    bin z;
    bin s;
    bin v;
-     cc fmslowconn static center;set fmslowconn minwh 80 30;set fmslowconn sizepolicy expanding fixed;
+     cc fmslowconn static center;set fmslowconn minwh 80 30;set fmslowconn sizepolicy expanding fixed;set fmslowconn text "";
      cc fmlogin combobox;set fmlogin minwh 80 20;;set fmlogin sizepolicy expanding fixed;
      cc fmloggedin static center;set fmloggedin minwh 80 30;set fmloggedin sizepolicy expanding fixed;
    bin z;
@@ -190,6 +190,8 @@ screenwh =: ''  NB.
 awaybrb =: awaygone =: 0
 winresize 1
 wd 'pshow'
+smoutput 'screeninfo: ' , wd 'qscreen'
+smoutput 'forminfo: ' , wd 'qform'
 
 NB. Start a heartbeat
 nextheartbeat =: 6!:1''

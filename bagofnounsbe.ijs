@@ -77,74 +77,72 @@ NB. Return non0 if error
 sockpoll =: 3 : 0
 NB. obsolete   'qbm sk tourn password' =. y
 feconnlost=.0
-NB. Wait for a pulse from the front end
-if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.  NB. allow long time for dialog box
-  0 return.  NB. scaf poll again - in real system use a long timeout and fail here
-end.
-NB. There is data to read.  Read it all, until we have the complete message(s).  First 4 bytes are the length
-hdr =. ''   NB. No data, no bytes of header
-cmdqueue =. 0$a:  NB. List of commands
-while. do.
-  while. 4>#hdr do.
-    'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
-    if. (0~:rc) +. (0=#data) do. feconnlost=.1 break. end.
-    hdr =. hdr , data
-    if. 4=#hdr do. break. end.
-    if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.4 break. end.
+if. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.
+  NB. There is data to read.  Read it all, until we have the complete message(s).  First 4 bytes are the length
+  hdr =. ''   NB. No data, no bytes of header
+  cmdqueue =. 0$a:  NB. List of commands
+  while. do.
+    while. 4>#hdr do.
+      'rc data' =. sdrecv_jsocket_ sk,(4-#hdr),00   NB. Read the length, from 2 (3!:4) #data
+      if. (0~:rc) +. (0=#data) do. feconnlost=.1 break. end.
+      hdr =. hdr , data
+      if. 4=#hdr do. break. end.
+      if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.4 break. end.
+    end.
+    if. feconnlost do. break. end.
+    hlen =. _2 (3!:4) hdr   NB. Number of bytes to read - could be 0
+    readdata =. ''
+    while. hlen > 0 do.
+      if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.2 break. end.
+      'rc data' =. sdrecv_jsocket_ sk,(4+hlen),00   NB. Read the data, plus the next length
+      if. rc~:0 do. rc return. end.
+      if. 0=#data do. feconnlost=.3 break. end.
+      readdata =. readdata , data
+      hlen=.hlen-#data  NB. when we have all the data, plus possibly the next length
+    end.
+    if. feconnlost do. break. end.
+    NB. If there is not another command, exit to process them
+    cmdqueue =. cmdqueue , < hlen }. readdata
+    if. hlen = 0 do. if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do. break. end. end.  NB. if hlen<0, we have started reading a length; if 0, must check
+    hdr =. hlen {. readdata  NB. transfer the length
+    if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.5 break. end.
   end.
-  if. feconnlost do. break. end.
-  hlen =. _2 (3!:4) hdr   NB. Number of bytes to read - could be 0
-  readdata =. ''
-  while. hlen > 0 do.
-    if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.2 break. end.
-    'rc data' =. sdrecv_jsocket_ sk,(4+hlen),00   NB. Read the data, plus the next length
-    if. rc~:0 do. rc return. end.
-    if. 0=#data do. feconnlost=.3 break. end.
-    readdata =. readdata , data
-    hlen=.hlen-#data  NB. when we have all the data, plus possibly the next length
-  end.
-  if. feconnlost do. break. end.
-  NB. If there is not another command, exit to process them
-  cmdqueue =. cmdqueue , < hlen }. readdata
-  if. hlen = 0 do. if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do. break. end. end.  NB. if hlen<0, we have started reading a length; if 0, must check
-  hdr =. hlen {. readdata  NB. transfer the length
-  if. -. sk e. 1 {:: sdselect_jsocket_ sk;'';'';5000 do. feconnlost=.5 break. end.
-end.
-if. feconnlost do. feconnlost [ smoutput 'fe connection lost'  return. end.
-NB. perform pre-sync command processing.
-if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
-senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('MULTI "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
-NB. Create a connection to the server and send all the data in an INCR command
-if. 0=ssk do.  NB. If we don't have an open connection, make one
-  for_dly. 1 1 300 # 1000 2000 3000 do.
-    NB.?lintloopbodyalways
-    ssk =: 1 {:: sdsocket_jsocket_ ''  NB. listening socket
-    sdioctl_jsocket_ ssk , FIONBIO_jsocket_ , 1  NB. Make socket non-blocking
-    rc =. sdconnect_jsocket_ ssk;qbm,<8090
-    if. ssk e. 2 {:: sdselect_jsocket_ '';ssk;'';dly do. break. end.
-    sdclose_jsocket_ ssk
-    smoutput 'Error ' , (":rc) , ' connecting to server'
-    qbm2 =. }. sdgethostbyname_jsocket_ 'www.quizbowlmanager.com'  NB. In case the address changed
-    if. _1 {:: qbm2 -.@-: '255.255.255.255' do. qbm =: qbm2 end.  NB. Save new address, if it is valid
-    ssk =: 0
-  end.
-  if. ssk=0 do.  NB. uncorrectable server error
-    7 return.
-  end.
-  hangoverdata =: ''
+  if. feconnlost do. feconnlost [ smoutput 'fe connection lost'  return. end.
+  NB. perform pre-sync command processing.
+  if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
+  senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('MULTI "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
+  NB. Create a connection to the server and send all the data in an INCR command
+  if. 0=ssk do.  NB. If we don't have an open connection, make one
+    for_dly. 1 1 300 # 1000 2000 3000 do.
+      NB.?lintloopbodyalways
+      ssk =: 1 {:: sdsocket_jsocket_ ''  NB. listening socket
+      sdioctl_jsocket_ ssk , FIONBIO_jsocket_ , 1  NB. Make socket non-blocking
+      rc =. sdconnect_jsocket_ ssk;qbm,<8090
+      if. ssk e. 2 {:: sdselect_jsocket_ '';ssk;'';dly do. break. end.
+      sdclose_jsocket_ ssk
+      smoutput 'Error ' , (":rc) , ' connecting to server'
+      qbm2 =. }. sdgethostbyname_jsocket_ 'www.quizbowlmanager.com'  NB. In case the address changed
+      if. _1 {:: qbm2 -.@-: '255.255.255.255' do. qbm =: qbm2 end.  NB. Save new address, if it is valid
+      ssk =: 0
+    end.
+    if. ssk=0 do.  NB. uncorrectable server error
+      7 return.
+    end.
+    hangoverdata =: ''
 qprintf'ssk '
+  end.
+  NB. Send the data.  Should always go in one go
+  while. #senddata do.
+    rc =. senddata sdsend_jsocket_ ssk,0
+    if. 0{::rc do. 0{::rc [ ssk =: 0 [ sdclose_jsocket_ ssk return. end.
+    if. (#senddata) = 1{::rc do. break. end.
+    senddata =. (1{::rc) }. senddata
+    if. -. ssk e. 2 {:: sdselect_jsocket_ '';ssk;'';5000 do. rc =. 1;'' break. end.
+  end.
+  if. 0{::rc do. 8 [ ssk =: 0 [ sdclose_jsocket_ ssk  return. end.  NB. error sending - what's that about?  Abort
 end.
-NB. Send the data.  Should always go in one go
-while. #senddata do.
-  rc =. senddata sdsend_jsocket_ ssk,0
-  if. 0{::rc do. 0{::rc [ ssk =: 0 [ sdclose_jsocket_ ssk return. end.
-  if. (#senddata) = 1{::rc do. break. end.
-  senddata =. (1{::rc) }. senddata
-  if. -. ssk e. 2 {:: sdselect_jsocket_ '';ssk;'';5000 do. rc =. 1;'' break. end.
-end.
-if. 0{::rc do. 8 [ ssk =: 0 [ sdclose_jsocket_ ssk  return. end.  NB. error sending - what's that about?  Abort
 
-NB. Read the response, until the server closes
+NB. Read responses if any
 'rc rsockl wsockl esockl' =. sdselect_jsocket_ ssk;'';ssk;0
 if. (rc~:0) +. ssk e. esockl do. ssk =: 0 [ sdclose_jsocket_ ssk return. end.
 if. ssk e. rsockl do.  NB. If there's read data, process it
@@ -234,11 +232,23 @@ end.
 
 sys_timer =: 3 : 0
 try.
-  if. 0 = sk do. sockloop''
+  if. 0 = sk do. sockloop''  NB. estab connection to fe
   else.
-    rc =. sockpoll ''
-    if. rc do.  NB. scaf
+if. 1 do.
+    NB. loop right here until we lose heartbeat
+    while. do.
+      'rc r w e' =. sdselect_jsocket_ ((] ; '' ; ]) 0 -.~ sk,ssk) , <2000   NB. should always wake up
+      if. rc do. break. end.  NB. abort if 
+      if. #e do. rc =. 10 break. end.  NB. abort if error on socket
+      if. 0 = #r do. break. end.  NB. if nothing to process, exit timer without error to let keyboard in
+      if. rc =. sockpoll '' do. break. end.  NB. if there's something to do, do it, stop only if error
+wd 'msgs'
+    end.
+smoutput 'out of loop'
+else. rc =. sockpoll '' end.
+    if. rc do.  NB. if error, reset sockets
       sk =: 0 [ sdclose_jsocket_ sk  NB. close fe socket before we rewait
+      ssk =: 0 [ sdclose_jsocket_ ssk  NB. close host socket before we rewait
       smoutput 'Error ' , (":rc) , ' on sockets'
       waitstate =: 0  NB. Give another msg
     end.
@@ -387,7 +397,10 @@ elseif. y -: Glogin do. rejcmd =: 'LOGINREJ ' , (5!:5<'y') , CRLF
 end.
 NB. If the game hasn't started, and this is the first time we've seen this name, remember it
 NB. If teams have been drawn, invalidate them
-if. Gstate=GSWORDS do. if. (<y) -.@e. ; Gteams do. Gteams =: < (<y) , ; Gteams end. end.
+if. Gstate=GSWORDS do. if. (<y) -.@e. ; Gteams do.
+  Gteams =: < (<y) , ; Gteams
+  addtolog 'Login: ' , y
+end. end.
 ''
 )
 
@@ -477,8 +490,9 @@ NB. Gwordqueue =: ,: '1';'word';< ,<'dq'
   Gstate=:GSWACTOR
   Gtimedisp =: 0
   bagstatus''  NB. Init display of # words per round left
-  NB. Display the teams
-'<br><br>' addtolog ; ,&'<br>'&.>  a: ,.~ Gteamnames  ,. > Gteams
+  NB. Display the teams, removing the login list
+  Glogtext =: ''
+  '<br><br>' addtolog ; ,&'<br>'&.>  a: ,.~ Gteamnames  ,. > Gteams
 NB.?lintsaveglobals
 ''
 end.
