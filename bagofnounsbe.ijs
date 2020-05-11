@@ -174,7 +174,7 @@ gbls =. ".&.> gblifnames  NB. current values
 chgmsk =. gbls ~: Ggbls  NB. see what's different
 diffs =. (chgmsk # gblifnames) ,. chgmsk # gbls
 Ggbls =: gbls  NB. save current values to be old state next time
-Gbuttonblink =: ''  NB. this is a one-shot; clear after each change
+if. buttonresettime < 6!:1'' do. Gbuttonblink =: '' end.  NB. this is a one-shot; clear shortly after each change
 Gturnblink =: 0  NB. Also a one-shot
 NB. Return the changes; if none, return a 0-length heartbeat
 if. #diffs do.
@@ -297,6 +297,7 @@ Ggbls =: 0:"0 gblifnames  NB. Init old copy = something that never matches a box
 Gdqlist =. 0 3$a:
 Gturnwordlist =: 0 3$a:
 Gbuttonblink =: ''
+buttonresettime =: 0
 Gturnblink =: 0
 Gbagstatus =: 0 0 0
 Gteamnames =: 2$a:  NB. empty team names
@@ -661,7 +662,8 @@ if. (*@# Gwordqueue) *. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
   NB.   on the timer
   if. isnewround'' do. Gstate =: GSCONFIRM end.
   NB. Blink the pressed button as an ack to the team
-  Gbuttonblink =: score,retire  NB. This gets reset automatically
+  Gbuttonblink =: score,retire  NB. This gets reset automatically...
+  buttonresettime =: 1. + 6!:1''   NB. ... after this time
   bagstatus''  NB. Update count of words yet to do
 end.
 ''

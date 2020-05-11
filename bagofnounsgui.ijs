@@ -2,7 +2,7 @@ require 'socket'
 require 'strings'
 require'format/printf'
 sdcleanup_jsocket_ =: 3 : '0[(sdclose ::0:"0@[ shutdownJ@(;&2)"0)^:(*@#)SOCKETS_jsocket_'
-SWREV =: 104  NB. Current EC level
+SWREV =: 105  NB. Current EC level
 
 NB. Todo:
 NB. allow look at wds from previous round
@@ -411,19 +411,6 @@ end.
 )
 
 handGawaystatus =: 3 : 0
-if. Gstate=GSWSTART do.
-  awaystg =. getawaystg''
-  rwords =. getoldwords''
-  if. Glogin-:Gscorer do.
-    if. Glogin-:Gactor do. wd 'set fmgeneral text *You may fire when you are ready, Gridley.' , awaystg
-    else. wd 'set fmgeneral text *Start the clock when told to.'
-    end.
-  elseif. Glogin-:Gactor do. wd 'set fmgeneral text *When you are ready, tell the scorer to start the clock.' , awaystg
-  else. wd 'set fmgeneral text *' , awaystg , rwords
-  end.
-end.
-wd 'set fmawaybrb value ' , ": loggedin *. (<Glogin) e. 0 {:: Gawaystatus
-wd 'set fmawaygone value ' , ": loggedin *. (<Glogin) e. 1 {:: Gawaystatus
 ''
 )
 
@@ -535,8 +522,18 @@ case. GSWAUDITOR do.
   end.
   text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
 case. GSWSTART do.
+  awaystg =. getawaystg''
+  rwords =. getoldwords''
+  if. Glogin-:Gscorer do.
+    if. Glogin-:Gactor do. wd 'set fmgeneral text *You may fire when you are ready, Gridley.' , awaystg
+    else. wd 'set fmgeneral text *Start the clock when told to.'
+    end.
+  elseif. Glogin-:Gactor do. wd 'set fmgeneral text *When you are ready, tell the scorer to start the clock.' , awaystg
+  else. wd 'set fmgeneral text *' , awaystg , rwords
+  end.
   text =. Gscorer , ' starts the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
-case. GSACTING do. text =. Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password') , ' and ' , ((Gactor -.@-: Gscorer) # Gscorer , ' is ') , 'scoring'
+case. GSACTING do.
+  text =. Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password') , ' and ' , ((Gactor -.@-: Gscorer) # Gscorer , ' is ') , 'scoring'
 case. GSPAUSE do. text =. 'Clock stopped - ' , Gactor , ' is playing ' , (Groundno {:: 'Taboo';'Charades';'Password')
 case. GSSETTLE do. text =. Gactor , ' is finalizing scores'
 case. GSCONFIRM do.
