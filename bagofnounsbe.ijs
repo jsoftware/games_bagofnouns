@@ -109,7 +109,7 @@ if. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.
   end.
   if. feconnlost do. feconnlost [ smoutput 'fe connection lost'  return. end.
   NB. perform pre-sync command processing.
-  if. #;cmdqueue do. qprintf'cmdqueue ' end.  NB. scaf
+  if. #;cmdqueue do. smoutput'cmd rcvd' end.  NB. scaf
   senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('MULTI "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
   NB. Create a connection to the server and send all the data in an INCR command
   if. 0=ssk do.  NB. If we don't have an open connection, make one
@@ -129,7 +129,6 @@ if. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.
       7 return.
     end.
     hangoverdata =: ''
-qprintf'ssk '
   end.
   NB. Send the data.  Should always go in one go
   while. #senddata do.
@@ -149,7 +148,6 @@ if. ssk e. rsockl do.  NB. If there's read data, process it
   'rc readdata' =. sdrecv_jsocket_ ssk,10000,0  NB. read it
   if. rc do. rc [ ssk =: 0 [ sdclose_jsocket_ ssk return. end.  NB. error reading: close socket
   if. 0=#readdata do. 0 [ ssk =: 0 [ sdclose_jsocket_ ssk return. end.  NB. Host closes connection: close socket
-qprintf'hangoverdata readdata '
   hangoverdata =: hangoverdata , readdata
   NB. Verify response validity.
   NB. If we don't get a valid response, the game is in an unknown state.  There's nothing good to do, so we
@@ -157,7 +155,7 @@ qprintf'hangoverdata readdata '
   NB. Process commands until we get to no data or incomplete command
   whilst. #hangoverdata do.
     'rc data xsdata' =. fileserv_decrsphdr_sockfileserver_ hangoverdata
-qprintf'rc data xsdata '
+smoutput 'proc ' , (":#data) , ' bytes'
     hangoverdata =: xsdata   NB. save extra data for next time
     if. rc>0 do. 9 [ ssk =: 0 [ sdclose_jsocket_ ssk  return. end.   NB. Invalid msg - abort the connection
     NB. Process the response
