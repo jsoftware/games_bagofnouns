@@ -2,7 +2,7 @@ require 'socket'
 require 'strings'
 require'format/printf'
 sdcleanup_jsocket_ =: 3 : '0[(sdclose ::0:"0@[ shutdownJ@(;&2)"0)^:(*@#)SOCKETS_jsocket_'
-SWREV =: 105  NB. Current EC level
+SWREV =: 106  NB. Current EC level
 
 NB. Todo:
 NB. allow look at wds from previous round
@@ -117,8 +117,8 @@ grid colstretch 0 5; grid colstretch 1 2;
  rem left side: the display;
  bin g;
  grid shape 6 1;
- grid rowheight 0 30; grid rowheight 1 10; grid rowheight 2 120; grid rowheight 3 30; grid rowheight 4 30; grid rowheight 5 20;
- grid rowstretch 0 1; grid rowstretch 1 0; grid rowstretch 2 6; grid rowstretch 3 1; grid rowstretch 3 1; grid rowstretch 5 2;
+ grid rowheight 0 20; grid rowheight 1 10; grid rowheight 2 2; grid rowheight 3 15; grid rowheight 4 15; grid rowheight 5 10;
+ grid rowstretch 0 0; grid rowstretch 1 0; grid rowstretch 2 3; grid rowstretch 3 0; grid rowstretch 4 0; grid rowstretch 5 1;
   rem top row: scores & login;
   bin h;
    bin h;
@@ -146,7 +146,7 @@ grid colstretch 0 5; grid colstretch 1 2;
   rem row 2: progress bar;
   cc fmprogress progressbar 0 60 60;set fmprogress minwh 50 10;set fmprogress sizepolicy ignored fixed;
   rem row 3: general display;
-  cc fmgeneral edith;set fmgeneral edit 0;set fmgeneral sizepolicy expanding;
+  cc fmgeneral edith;set fmgeneral edit 0;set fmgeneral sizepolicy ignored;
   rem row 4: move to the next word;
   bin h;
    cc fmretire4 button;set fmretire4 sizepolicy expanding;
@@ -166,10 +166,10 @@ grid colstretch 0 5; grid colstretch 1 2;
    cc fmsieze1 button;set fmsieze1 sizepolicy expanding;set fmsieze1 font "Courier New" 24;set fmsieze1 text "";
   bin z;
   rem row 6: status line;
-  cc fmstatus editm readonly;set fmstatus sizepolicy preferred;
+  cc fmstatus editm readonly;rem set fmstatus sizepolicy preferred;
  bin z;
  rem right side: event log;
- cc fmlog edith;set fmlog wrap;set fmlog sizepolicy expanding;
+ cc fmlog edith;set fmlog wrap;set fmlog sizepolicy preferred;
 bin z;
 pas 0 0;
 )
