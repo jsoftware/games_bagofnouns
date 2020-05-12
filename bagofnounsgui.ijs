@@ -741,7 +741,10 @@ if. Gbuttonblink -: '' do.
   24 setfont 'p<set fmretire>q< font "Courier New" *;>'  (8!:2) i. 5
 elseif. (Gstate e. GSACTING,GSPAUSE,GSSETTLE,GSCONFIRM) *. Glogin -.@-: Gscorer do.
   NB. Blink only in word-scoring states, and not on the scorer's screen to avoid distraction
-  32 setfont 'p<set fmretire>q< font "Courier New" * bold;>' (8!:2) 0 1 2 3 4 4 {~ (_2 ]\ 0 _1  _1 0  1 1  0 0  0 1  0 2) i. Gbuttonblink
+  buttonno =. 0 1 2 3 4 4 {~ (_2 ]\ 0 _1  _1 0  1 1  0 0  0 1  0 2) i. Gbuttonblink
+  NB. In case we have back-to-back blinks, turn off the first one
+  24 setfont 'p<set fmretire>q< font "Courier New" *;>'  (8!:2) (i. 5) -. buttonno
+  32 setfont 'p<set fmretire>q< font "Courier New" * bold;>' (8!:2) buttonno
 end.
 ''
 )
