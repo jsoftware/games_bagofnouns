@@ -207,9 +207,9 @@ forcefrac =. y
 NB. Remember screensize
 oldwh =: screenwh
 'screenpx screenwh' =: (4 5,:2 3) { 0 ". wd 'psel formbon;qscreen'
-NB. if forcefrac, set frac to 90% (keep width unchanged)
-if. forcefrac do. screenfrac =: 0.5 0.9 end.
-NB.?lintonly  screenfrac =: 0.5 0.9
+NB. if forcefrac, set frac to 80% (keep width unchanged)
+if. forcefrac do. screenfrac =: 0.5 0.8 end.
+NB.?lintonly  screenfrac =: 0.5 0.8
 NB. if screensize changes, set wh to same proportion of screen as before
 if. screenwh -.@-: oldwh do.
   wd 'pmove ' , ": <. (,~ screenwh) * (-:@:-. , ]) screenfrac
