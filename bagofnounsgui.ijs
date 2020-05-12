@@ -212,6 +212,7 @@ if. forcefrac do. screenfrac =: 0.5 0.8 end.
 NB.?lintonly  screenfrac =: 0.5 0.8
 NB. if screensize changes, set wh to same proportion of screen as before
 if. screenwh -.@-: oldwh do.
+smoutput 'screen resized with pmove ' , ": <. (,~ screenwh) * (-:@:-. , ]) screenfrac  NB. scaf
   wd 'pmove ' , ": <. (,~ screenwh) * (-:@:-. , ]) screenfrac
   NB. Set the font size based on screen size
   12 setfont 'set fmtmname0 font "Courier New" * bold'
