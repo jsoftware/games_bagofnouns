@@ -716,7 +716,7 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
       else. dqtext =. ''
       end.
       if. (Gstate=GSPAUSE) *. (Glogin -: Gscorer) do.
-        dqtext =. dqtext , ((*@# dqtext) # <'br'>) , (actcolor 'Start the clock when the discussion is over.') , '<br>'
+        dqtext =. dqtext , ((*@# dqtext) # '<br>') , (actcolor 'Start the clock when the discussion is over.') , '<br>'
       end.
       NB. Give the scorer/auditor a summary of the scoring actions performed this round
       if. (<Glogin) e. Gscorer;Gauditor do.
