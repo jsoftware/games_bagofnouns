@@ -109,7 +109,7 @@ if. sk e. 1 {:: sdselect_jsocket_ sk;'';'';0 do.
   end.
   if. feconnlost do. feconnlost [ smoutput 'fe connection lost'  return. end.
   NB. perform pre-sync command processing.
-  if. #;cmdqueue do. smoutput'cmd rcvd' end.  NB. scaf
+NB. obsolete   if. #;cmdqueue do. smoutput'cmd rcvd' end.  NB. scaf
   senddata =. (<password) fileserv_addreqhdr_sockfileserver_  ('MULTI "' , tourn , '" "bonlog" "' , (":incrhwmk) , '"',CRLF) , ; presync cmdqueue
   NB. Create a connection to the server and send all the data in an INCR command
   if. 0=ssk do.  NB. If we don't have an open connection, make one
@@ -155,7 +155,6 @@ if. ssk e. rsockl do.  NB. If there's read data, process it
   NB. Process commands until we get to no data or incomplete command
   whilst. #hangoverdata do.
     'rc data xsdata' =. fileserv_decrsphdr_sockfileserver_ hangoverdata
-smoutput 'proc ' , (":#data) , ' bytes'
     hangoverdata =: xsdata   NB. save extra data for next time
     if. rc>0 do. 9 [ ssk =: 0 [ sdclose_jsocket_ ssk  return. end.   NB. Invalid msg - abort the connection
     NB. Process the response

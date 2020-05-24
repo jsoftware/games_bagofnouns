@@ -350,9 +350,6 @@ if. sk do.
   while. #senddata do.
     if. -. sk e. 2 {:: sdselect_jsocket_ '';sk;'';1000 do. backdied 5 return. end.
     rc =. senddata sdsend_jsocket_ sk,0
-if. #y do.
-  qprintf'y '
-end. NB. scaf
     if. 0~:0{::rc do. backdied 6 return. end.
     senddata =. (1 {:: rc) }. senddata
   end.
@@ -546,7 +543,7 @@ case. GSSETTLE do. text =. Gactor , ' is finalizing scores'
 case. GSCONFIRM do.
   text =. ((*Gtimedisp) {:: 'End of turn';'Round change') , '.  Remember the words.'
 case. GSCHANGE do.
-  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Round change!  Next round: ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  Are you ready?'
+  wd 'set fmgeneral text *' , (Glogin-:Gactor) # 'Round change!  Next round: ',(Groundno {:: 'Taboo';'Charades';'Password'),'.  ' , actcolor 'Are you ready?'
   text =. 'Changing to ' , Groundno {:: 'Taboo';'Charades';'Password';'Scotch'
 case. GSCHANGEWACTOR do.
   wd 'set fmgeneral text *' , (Glogin-:Gactor) # actcolor 'Do you want a scorer for the ',(Groundno {:: 'Taboo';'Charades';'Password'),' round?'
