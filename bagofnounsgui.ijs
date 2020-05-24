@@ -502,10 +502,10 @@ NB. Set display for the variable buttons
 wd 'set fmsieze0 text *' , (1;((0{::buttoncaptions0) i. Gstate)) {:: buttoncaptions0
 wd 'set fmsieze1 text *' , (1;((0{::buttoncaptions1) i. Gstate)) {:: buttoncaptions1
 if. Gstate -.@e. GSSETTLE,GSCONFIRM do. wd 'set fmscoreadj0 text "";set fmscoreadj1 text ""' end.
-NB. Get the string to show the words from last turn, if we are in the states where that is meaningful
-if. Gstate e. GSWACTOR,GSWSCORER,GSWAUDITOR,GSWSTART do. rwords =. getoldwords '<br><br>' else. rwords =. '' end.
 NB. Get away-status string
 awaystg =. getawaystg''
+NB. Get the string to show the words from last turn, if we are in the states where that is meaningful
+if. Gstate e. GSWACTOR,GSWSCORER,GSWAUDITOR,GSWSTART do. rwords =. getoldwords (*@# awaystg) # '<br><br>' else. rwords =. '' end.
 NB. Display the status line; if the general line is known from the state, do it too
 select. Gstate
 case. GSHELLO do. text =. 'Catching up'
@@ -710,6 +710,9 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
         dqplrs =. (((<0;0 1) { Gwordqueue) -:"1 (2 {."1 Gdqlist)) # 2 {"1 Gdqlist 
         dqtext =. 'DQ: '&,^:(*@#) ;:^:_1 dqplrs -. ((-. Gteamup) {:: Gteams) , <Gactor 
       else. dqtext =. ''
+      end.
+      if. (Gstate=GSPAUSE) *. (Glogin -: Gscorer) do.
+        dqtext =. dqtext , ((*@# dqtext) # <'br'>) , (actcolor 'Start the clock when the discussion is over.') , '<br>'
       end.
       NB. Give the scorer/auditor a summary of the scoring actions performed this round
       if. (<Glogin) e. Gscorer;Gauditor do.
