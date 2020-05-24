@@ -505,7 +505,7 @@ if. Gstate -.@e. GSSETTLE,GSCONFIRM do. wd 'set fmscoreadj0 text "";set fmscorea
 NB. Get away-status string
 awaystg =. getawaystg''
 NB. Get the string to show the words from last turn, if we are in the states where that is meaningful
-if. Gstate e. GSWACTOR,GSWSCORER,GSWAUDITOR,GSWSTART do. rwords =. getoldwords (*@# awaystg) # '<br><br>' else. rwords =. '' end.
+if. Gstate e. GSWACTOR,GSWSCORER,GSWAUDITOR,GSWSTART do. rwords =. getoldwords '' else. rwords =. '' end.
 NB. Display the status line; if the general line is known from the state, do it too
 select. Gstate
 case. GSHELLO do. text =. 'Catching up'
@@ -514,26 +514,26 @@ case. GSAUTH do. text =. 'Waiting for authorization'
 case. GSWORDS do. text =. 'Players are entering words'
 case. GSWACTOR do.
   upplrs =. 2 {. (Gteamup {:: Gteams) -. 1 {:: Gawaystatus  NB. top 2 from teamup, but not if away
-  wd 'set fmgeneral text *Up for ',(Gteamup {:: Gteamnames),': ' , (actcolor^:(-:&Glogin) 0 {:: upplrs) , (' then '&,^:(*@#) (1 {:: upplrs)) , awaystg , rwords
+  wd 'set fmgeneral text *Up for ',(Gteamup {:: Gteamnames),': ' , (actcolor^:(-:&Glogin) 0 {:: upplrs) , (' then '&,^:(*@#) (1 {:: upplrs)) , awaystg , '<br><br>' , rwords
   text =. 'Need player for ' , (Groundno {:: 'Taboo';'Charades';'Password'), ' from ' , Gteamup {:: Gteamnames
 case. GSWSCORER do.
   upplr =. > {. ((-. Gteamup) {:: Gteams) -. 1 {:: Gawaystatus  NB. top from teamup, but not if away
-  wd 'set fmgeneral text *Click to score' , ((*@#upplr) # ' (',(actcolor^:(-:&Glogin) upplr),' is up next for ',((-.Gteamup) {:: Gteamnames),')'),'.' , awaystg , rwords
+  wd 'set fmgeneral text *Click to score' , ((*@#upplr) # ' (',(actcolor^:(-:&Glogin) upplr),' is up next for ',((-.Gteamup) {:: Gteamnames),')'),'.' , awaystg , '<br><br>' , rwords
   text =. 'Need someone to score for ' , Gactor
 case. GSWAUDITOR do.
   if. Glogin-:Gactor do. wd 'set fmgeneral text *' , actcolor 'If you''re sure you won''t make a mistake, you can play without an auditor.'
   else.
     upplr =. > {. ((-. Gteamup) {:: Gteams) -. 1 {:: Gawaystatus  NB. top from teamup, but not if away
-    wd 'set fmgeneral text *Click to audit' , ((*@#upplr) # ' (',(actcolor^:(-:&Glogin) upplr),' is up next for ',((-.Gteamup) {:: Gteamnames),')'),'.' , awaystg , rwords
+    wd 'set fmgeneral text *Click to audit' , ((*@#upplr) # ' (',(actcolor^:(-:&Glogin) upplr),' is up next for ',((-.Gteamup) {:: Gteamnames),')'),'.' , awaystg , '<br><br>' , rwords
   end.
   text =. 'Accepting an auditor for ' , Gactor , ' (optional)'
 case. GSWSTART do.
   if. Glogin-:Gscorer do.
-    if. Glogin-:Gactor do. wd 'set fmgeneral text *' , actcolor 'Start the clock.' , awaystg
+    if. Glogin-:Gactor do. wd 'set fmgeneral text *' , (actcolor 'Start the clock.') , awaystg
     else. wd 'set fmgeneral text *' , actcolor 'Start the clock when told to.'
     end.
-  elseif. Glogin-:Gactor do. wd 'set fmgeneral text *' , actcolor 'When you are ready, tell the scorer to start the clock.' , awaystg
-  else. wd 'set fmgeneral text *' , awaystg , rwords
+  elseif. Glogin-:Gactor do. wd 'set fmgeneral text *' , (actcolor 'When you are ready, tell the scorer to start the clock.') , awaystg
+  else. wd 'set fmgeneral text *' , awaystg , ((*@#awaystg) # '<br><br>') , rwords
   end.
   text =. Gscorer , ' starts the clock for ' , Groundno {:: 'Taboo';'Charades';'Password'
 case. GSACTING do.
@@ -671,14 +671,18 @@ end.
 )
 
 
-APSinstructions =: <;._2 (0 : 0)
+APSinstructions =: _2 ]\ <;._2 (0 : 0)
+<small>Play in order.  Word turns from red to blue when scored:</small>
 <small>Play in order.  Word turns from red to blue when scored:</small>
 Clock is stopped - wait
+<font color=red>Clock is stopped - restart it when discussion is over</font>
+<small>Handle the word in red (usually with Time Expired), or use big buttons to change scores.</small>
 <small>Handle the word in red (usually with Time Expired), or use big buttons to change scores.</small>
 )
 handGwordqueue =: 3 : 0
 if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
   if. Glogin -: Gactor do.
+    isscorer =. Glogin -: Gscorer  NB. scoring too?
     NB. Special display for the actor or actor/scorer.  Prefix it with instructions
     NB. Format the words we have acted this round (if any)
     if. #twds =. (<Groundno) (] #~ (= {."1)) Gturnwordlist do.
@@ -692,14 +696,14 @@ if. Gstate e. GSACTING,GSPAUSE,GSSETTLE do.
     if. #wwds =. Gwordqueue do.
       fwwds =. 1 {"1 wwds
       scoretag =. ((0 _1;_1 0;1 1;0 0;0 1;0 2) i. 2 {"1 wwds) { ' (didn''t know it)';' (passed -1)';' (scored +1)';' (time expired)';' (guessed late)';' (foul)';''
-      fwwds =. 1 (('<big><font color=red>' , ,&'</font></big>')&.>@{. , ('<small>' , ,&'</small>')&.>@}.) fwwds
+      fwwds =. (Gstate~:GSPAUSE) (('<big><font color=red>' , ,&'</font></big>')&.>@{. , ('<small>' , ,&'</small>')&.>@}.) fwwds
       fwwds =. fwwds ,&.> scoretag
     else. fwwds =. 0$a:
     end.
     NB. Select words to show, format as list.  During turn leave space for one word from turnwordlist, possibly empty; when settling show all
     showwds =. ({:^:(Gstate~:GSSETTLE) ftwds) , fwwds
     showwds =. ('<ul>' , ,&'</ul>') ;@:(('<li>' , ,&'</li>')&.>) showwds  NB. Make each word a list element, and the whole thing a list
-    instr =. ((GSACTING,GSPAUSE,GSSETTLE) i. Gstate) {:: APSinstructions
+    instr =. (<((GSACTING,GSPAUSE,GSSETTLE) i. Gstate),isscorer) {:: APSinstructions
     wd 'set fmgeneral text *' , instr , showwds
     if. Gstate=GSSETTLE do. wd 'set fmgeneral scroll max' end.
   else.
