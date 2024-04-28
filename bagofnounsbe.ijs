@@ -1004,7 +1004,7 @@ NB. The gerund assignment requires more than one name, so duplicate the last:
 ('`' , ;:^:_1 (, {:) l) =: (, {:) r
 )
 
-NB. 18!:4 without side effects
+NB. cocurrent without side effects
 setlocale =: 18!:4
 
 NB. Cuts
