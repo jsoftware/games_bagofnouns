@@ -1005,7 +1005,7 @@ NB. The gerund assignment requires more than one name, so duplicate the last:
 )
 
 NB. cocurrent without side effects
-setlocale =: 18!:4
+NB. setlocale =: 18!:4
 
 NB. Cuts
 onpiecesbetweenm =: 2 : '(u ;._1)@:(n&,)'
