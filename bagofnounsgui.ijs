@@ -1190,9 +1190,6 @@ NB. The gerund assignment requires more than one name, so duplicate the last:
 ('`' , ;:^:_1 (, {:) l) =: (, {:) r
 )
 
-NB. cocurrent without side effects
-NB. setlocale =: 18!:4
-
 NB. Cuts
 onpiecesbetweenm =: 2 : '(u ;._1)@:(n&,)'
 onpiecesbetweend =: 2 : '(u>)"_1 <;._1@(n&,)'
