@@ -1762,7 +1762,6 @@ NB. Conjunction.  u is applied in each locale v
 NB. Note: these define a local cocurrent so that cocurrent can run even if the
 NB. locale destroyed itself
 inlocales =: 2 : 0
-cocurrent =. 18!:4
 i =. 18!:5 ''
 for_l. n do.
   NB.?lintonly l =. <''
@@ -1772,7 +1771,6 @@ end.
 cocurrent i
 ''
 :
-cocurrent =. 18!:4
 i =. 18!:5 ''
 for_l. n do.
   NB.?lintonly l =. <''
@@ -1784,7 +1782,6 @@ cocurrent i
 )
 NB. same, but return result
 inlocalesr =: 2 : 0
-cocurrent =. 18!:4
 i =. 18!:5 ''
 r =. 0$a:
 for_l. n do.
@@ -1795,7 +1792,6 @@ end.
 cocurrent i
 r
 :
-cocurrent =. 18!:4
 i =. 18!:5 ''
 r =. 0$a:
 for_l. n do.
